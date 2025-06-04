@@ -17,9 +17,8 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
   const { addTileToHand, removeTileFromHand, addDiscardedTile, addMeld } = useGameStore();
   
   const [selectedTiles, setSelectedTiles] = useState<Tile[]>([]);
-  const [inputMode, setInputMode] = useState<'hand' | 'discard' | 'peng' | 'angang' | 'zhigang' | 'jiagang'>('hand');
-  const [selectedDiscardPlayer, setSelectedDiscardPlayer] = useState<number>(0); // 默认为上家（显示索引0）
-  const [selectedHandPlayer, setSelectedHandPlayer] = useState<number>(0); // 默认为上家（显示索引0）
+  const [selectedPlayer, setSelectedPlayer] = useState<number>(0); // 默认选择上家（显示索引0）
+  const [operationType, setOperationType] = useState<'hand' | 'discard' | 'peng' | 'angang' | 'zhigang' | 'jiagang'>('hand');
   
   // 所有可选的牌
   const availableTiles: Tile[] = [];
@@ -38,17 +37,16 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
   for (let i = 1; i <= 9; i++) {
     availableTiles.push(createTile(TileType.TONG, i));
   }
-  
+
   const handleTileClick = (tile: Tile) => {
-    const actualPlayerId = displayOrder[selectedHandPlayer]; // 转换显示索引为实际Player ID
-    const actualDiscardPlayerId = displayOrder[selectedDiscardPlayer]; // 转换显示索引为实际Player ID
+    const actualPlayerId = displayOrder[selectedPlayer]; // 转换显示索引为实际Player ID
     
-    if (inputMode === 'hand') {
+    if (operationType === 'hand') {
       // 为当前选中的玩家添加手牌
       addTileToHand(actualPlayerId, tile);
-    } else if (inputMode === 'discard') {
-      addDiscardedTile(tile, actualDiscardPlayerId);
-    } else if (inputMode === 'peng') {
+    } else if (operationType === 'discard') {
+      addDiscardedTile(tile, actualPlayerId);
+    } else if (operationType === 'peng') {
       // 碰牌：创建碰牌组并添加到melds
       const meld: Meld = {
         type: MeldType.PENG,
@@ -56,7 +54,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
         exposed: true
       };
       addMeld(actualPlayerId, meld);
-    } else if (inputMode === 'angang') {
+    } else if (operationType === 'angang') {
       // 暗杠：创建暗杠组并添加到melds
       const meld: Meld = {
         type: MeldType.GANG,
@@ -65,7 +63,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
         gang_type: GangType.AN_GANG
       };
       addMeld(actualPlayerId, meld);
-    } else if (inputMode === 'zhigang') {
+    } else if (operationType === 'zhigang') {
       // 直杠：创建明杠组并添加到melds
       const meld: Meld = {
         type: MeldType.GANG,
@@ -74,7 +72,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
         gang_type: GangType.MING_GANG
       };
       addMeld(actualPlayerId, meld);
-    } else if (inputMode === 'jiagang') {
+    } else if (operationType === 'jiagang') {
       // 加杠：创建明杠组并添加到melds
       const meld: Meld = {
         type: MeldType.GANG,
@@ -117,6 +115,19 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
   const displayNames = displayOrder.map(id => playerNames[id]);
   const displayColors = displayOrder.map(id => playerColors[id]);
 
+  // 获取操作类型的中文名称
+  const getOperationName = (type: 'hand' | 'discard' | 'peng' | 'angang' | 'zhigang' | 'jiagang'): string => {
+    const operationMap = {
+      'hand': '添加手牌',
+      'discard': '弃牌',
+      'peng': '碰牌',
+      'angang': '暗杠',
+      'zhigang': '直杠',
+      'jiagang': '加杠'
+    };
+    return operationMap[type] || type;
+  };
+
   return (
     <div className={`bg-green-100 rounded-lg p-3 h-full flex flex-col ${className}`}>
       {/* 麻将桌布局 - 与选择麻将牌区域相同的宽度 */}
@@ -124,91 +135,26 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
         <MahjongTable cardBackStyle={cardBackStyle} />
       </div>
       
-      {/* 输入模式切换 - 增加为其他玩家添加手牌的选项 */}
+      {/* 操作控制区域 */}
       <div className="mb-3 flex-shrink-0">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex bg-gray-200 rounded-lg p-1">
-            <button
-              onClick={() => setInputMode('hand')}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                inputMode === 'hand'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              添加到手牌
-            </button>
-            <button
-              onClick={() => setInputMode('discard')}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                inputMode === 'discard'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              直接弃牌
-            </button>
-            <button
-              onClick={() => setInputMode('peng')}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                inputMode === 'peng'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              碰牌
-            </button>
-            <button
-              onClick={() => setInputMode('angang')}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                inputMode === 'angang'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              暗杠
-            </button>
-            <button
-              onClick={() => setInputMode('zhigang')}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                inputMode === 'zhigang'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              直杠
-            </button>
-            <button
-              onClick={() => setInputMode('jiagang')}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                inputMode === 'jiagang'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              加杠
-            </button>
-          </div>
-
-          {/* 手牌玩家选择 */}
-          {(inputMode === 'hand' || inputMode === 'peng' || inputMode === 'angang' || inputMode === 'zhigang' || inputMode === 'jiagang') && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-600">
-                {inputMode === 'hand' ? '为谁添加手牌:' : 
-                 inputMode === 'peng' ? '为谁添加碰牌:' :
-                 inputMode === 'angang' ? '为谁添加暗杠:' : 
-                 inputMode === 'zhigang' ? '为谁添加直杠:' : 
-                 '为谁添加加杠:'}
+        <div className="flex flex-col gap-3">
+          
+          {/* 第一行：选择玩家和选择操作 */}
+          <div className="flex items-center gap-6 flex-wrap">
+            {/* 第一步：选择玩家 */}
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-gray-700 min-w-max">
+                ① 选择玩家:
               </span>
               <div className="flex gap-1">
                 {displayNames.map((name, index) => (
                   <button
                     key={index}
-                    onClick={() => setSelectedHandPlayer(index)}
-                    className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                      selectedHandPlayer === index
-                        ? `bg-opacity-20 ${displayColors[index].replace('text-', 'bg-').replace('-600', '-200')} ${displayColors[index]} border border-current`
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    onClick={() => setSelectedPlayer(index)}
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      selectedPlayer === index
+                        ? `bg-opacity-20 ${displayColors[index].replace('text-', 'bg-').replace('-600', '-200')} ${displayColors[index]} border-2 border-current`
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-2 border-transparent'
                     }`}
                   >
                     {name}
@@ -216,81 +162,111 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
                 ))}
               </div>
             </div>
-          )}
 
-          {/* 弃牌对手选择 */}
-          {inputMode === 'discard' && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-600">弃牌玩家:</span>
-              <div className="flex gap-1">
-                {displayNames.map((name, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setSelectedDiscardPlayer(index)}
-                    className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                      selectedDiscardPlayer === index
-                        ? `bg-opacity-20 ${displayColors[index].replace('text-', 'bg-').replace('-600', '-200')} ${displayColors[index]} border border-current`
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    {name}
-                  </button>
-                ))}
+            {/* 第二步：选择操作类型 */}
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-gray-700 min-w-max">
+                ② 选择操作:
+              </span>
+              <div className="flex bg-gray-200 rounded-lg p-1">
+                <button
+                  onClick={() => setOperationType('hand')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    operationType === 'hand'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  添加手牌
+                </button>
+                <button
+                  onClick={() => setOperationType('discard')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    operationType === 'discard'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  弃牌
+                </button>
+                <button
+                  onClick={() => setOperationType('peng')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    operationType === 'peng'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  碰牌
+                </button>
+                <button
+                  onClick={() => setOperationType('angang')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    operationType === 'angang'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  暗杠
+                </button>
+                <button
+                  onClick={() => setOperationType('zhigang')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    operationType === 'zhigang'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  直杠
+                </button>
+                <button
+                  onClick={() => setOperationType('jiagang')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    operationType === 'jiagang'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  加杠
+                </button>
               </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
       
       {/* 麻将牌选择区 - 可滚动，占用剩余空间 */}
       <div className="bg-white rounded-lg p-3 border border-gray-300 flex-1 overflow-y-auto">
-        <h3 className="text-base font-semibold text-gray-700 mb-3">
-          选择麻将牌 
-          {inputMode === 'hand' && (
-            <span className="text-sm text-gray-500 ml-2">
-              (为 {displayNames[selectedHandPlayer]} 添加手牌)
+        <div className="flex items-center gap-4 mb-3">
+          <h3 className="text-base font-semibold text-gray-700">
+            ③ 选择麻将牌
+          </h3>
+          
+          {/* 当前操作状态提示 */}
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-md">
+            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+            <span className="text-sm text-blue-700">
+              当前操作: 为 <span className="font-medium">{displayNames[selectedPlayer]}</span> {getOperationName(operationType)}
             </span>
-          )}
-          {inputMode === 'discard' && (
-            <span className="text-sm text-gray-500 ml-2">
-              (弃牌到牌桌 - {displayNames[selectedDiscardPlayer]})
-            </span>
-          )}
-          {inputMode === 'peng' && (
-            <span className="text-sm text-gray-500 ml-2">
-              (为 {displayNames[selectedHandPlayer]} 添加碰牌)
-            </span>
-          )}
-          {inputMode === 'angang' && (
-            <span className="text-sm text-gray-500 ml-2">
-              (为 {displayNames[selectedHandPlayer]} 添加暗杠)
-            </span>
-          )}
-          {inputMode === 'zhigang' && (
-            <span className="text-sm text-gray-500 ml-2">
-              (为 {displayNames[selectedHandPlayer]} 添加直杠)
-            </span>
-          )}
-          {inputMode === 'jiagang' && (
-            <span className="text-sm text-gray-500 ml-2">
-              (为 {displayNames[selectedHandPlayer]} 添加加杠)
-            </span>
-          )}
-        </h3>
+          </div>
+        </div>
         
         {/* 所有麻将牌一列显示 */}
         <div>
           <div className="flex gap-0.5 flex-wrap">
-            {availableTiles.map((tile, index) => (
-              <MahjongTile
-                key={`tile-${tile.type}-${tile.value}`}
-                tile={tile}
-                size="small"
-                onClick={() => handleTileClick(tile)}
-                animationDelay={index * 0.02}
-                cardBackStyle={cardBackStyle}
-              />
-            ))}
+            {availableTiles.map((tile, index) => {
+              return (
+                <MahjongTile
+                  key={`tile-${tile.type}-${tile.value}`}
+                  tile={tile}
+                  size="small"
+                  variant="default"
+                  onClick={() => handleTileClick(tile)}
+                  animationDelay={index * 0.02}
+                  cardBackStyle={cardBackStyle}
+                />
+              );
+            })}
           </div>
         </div>
       </div>

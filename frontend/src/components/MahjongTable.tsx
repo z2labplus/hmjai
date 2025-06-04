@@ -80,7 +80,7 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
                       key={`player-${playerId}-hand-${index}`}
                       tile={tile}
                       size="small"
-                      variant="default"
+                      variant={playerId === 0 ? "default" : "back"}
                       seamless={true}
                       cardBackStyle={cardBackStyle}
                     />
