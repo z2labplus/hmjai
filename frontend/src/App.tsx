@@ -44,7 +44,7 @@ function App() {
               animate={{ opacity: 1, x: 0 }}
               className="flex items-center gap-3"
             >
-              <div className="text-2xl">🀄</div>
+              <div className="text-2xl">🀅</div>
               <div>
                 <h1 className="text-lg font-bold text-gray-900">
                   欢乐麻将辅助工具
@@ -93,7 +93,7 @@ function App() {
         </div>
       </header>
 
-      {/* 主内容区 - 占满剩余空间 */}
+      {/* 主内容区 */}
       <main className="flex-1 flex overflow-hidden">
         <div className="w-full h-full flex">
           {/* 左侧：游戏面板 - 占用更多空间 */}

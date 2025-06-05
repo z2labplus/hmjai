@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useGameStore, selectPlayerHand } from '../stores/gameStore';
 import { Tile, MeldType, GangType, calculateRemainingTiles } from '../types/mahjong';
 import MahjongTile from './MahjongTile';
+import SimpleSourceIndicator from './SimpleSourceIndicator';
 import { CardBackStyle } from './MahjongTile';
 
 interface MahjongTableProps {
@@ -92,7 +93,7 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
               {hand.melds.length > 0 && (
                 <div style={{ display: 'flex', alignItems: 'flex-end' }}>
                   {hand.melds.map((meld, index) => (
-                    <div key={`meld-${index}`} style={{ 
+                    <div key={`meld-${index}`} className="relative" style={{ 
                       display: 'flex', 
                       alignItems: 'flex-end',
                       backgroundColor: 'rgba(255,255,255,0.8)', 
@@ -102,26 +103,56 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
                     }}>
                       {meld.tiles.map((tile: Tile, tileIndex: number) => {
                         // 暗杠显示逻辑
-                        let variant: 'default' | 'disabled' | 'back' = 'default';
+                        let variant: 'default' | 'selected' | 'selectedHorizontal' | 'recommended' | 'disabled' | 'disabledHorizontal' | 'back' = 'default';
+                        let additionalClassName = '';
+                        
                         if (meld.type === MeldType.GANG && meld.gang_type === GangType.AN_GANG) {
                           if (playerId === 0) {
-                            // 我的暗杠：只有第二张牌不可见（索引1）
-                            variant = tileIndex === 1 ? 'disabled' : 'default';
+                            // 我的暗杠：所有4张牌都显示为disabled样式
+                            variant = 'disabled';
                           } else {
                             // 其他玩家的暗杠：全部显示背面
                             variant = 'back';
                           }
+                        } else if (meld.type === MeldType.GANG && meld.gang_type === GangType.JIA_GANG) {
+                          // 加杠显示逻辑：前3张正常显示，最后一张使用横向disabled样式
+                          if (tileIndex === 3) {
+                            variant = 'disabled';
+                          } else {
+                            variant = 'default';
+                          }
+                        } else if (meld.type === MeldType.GANG && meld.gang_type === GangType.MING_GANG) {
+                          // 直杠显示逻辑：前3张正常显示，第4张使用横向选中样式
+                          if (tileIndex === 3) {
+                            variant = 'selected';
+                          } else {
+                            variant = 'default';
+                          }
                         }
                         
                         return (
-                          <MahjongTile
-                            key={`meld-tile-${index}-${tileIndex}`}
-                            tile={tile}
-                            size="small"
-                            variant={variant}
-                            seamless={true}
-                            cardBackStyle={cardBackStyle}
-                          />
+                          <div key={`meld-tile-${index}-${tileIndex}`} className="relative">
+                            <MahjongTile
+                              tile={tile}
+                              size="small"
+                              variant={variant}
+                              seamless={true}
+                              className={additionalClassName}
+                              cardBackStyle={cardBackStyle}
+                            />
+                            
+                            {/* 明杠来源指示器 - 只在第4张牌上显示 */}
+                            {meld.type === MeldType.GANG && 
+                             meld.gang_type === GangType.MING_GANG && 
+                             tileIndex === 3 && 
+                             meld.source_player !== undefined && (
+                              <SimpleSourceIndicator
+                                sourcePlayer={meld.source_player}
+                                currentPlayer={playerId}
+                                className="absolute -top-1 -right-1"
+                              />
+                            )}
+                          </div>
                         );
                       })}
                     </div>

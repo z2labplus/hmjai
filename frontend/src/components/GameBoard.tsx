@@ -19,6 +19,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
   const [selectedTiles, setSelectedTiles] = useState<Tile[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState<number>(0); // 默认选择上家（显示索引0）
   const [operationType, setOperationType] = useState<'hand' | 'discard' | 'peng' | 'angang' | 'zhigang' | 'jiagang'>('hand');
+  const [selectedSourcePlayer, setSelectedSourcePlayer] = useState<number | null>(null); // 新增：被杠玩家选择
   
   // 所有可选的牌
   const availableTiles: Tile[] = [];
@@ -69,7 +70,8 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
         type: MeldType.GANG,
         tiles: [tile, tile, tile, tile],
         exposed: true,
-        gang_type: GangType.MING_GANG
+        gang_type: GangType.MING_GANG,
+        source_player: selectedSourcePlayer !== null ? displayOrder[selectedSourcePlayer] : undefined
       };
       addMeld(actualPlayerId, meld);
     } else if (operationType === 'jiagang') {
@@ -107,6 +109,15 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
     setSelectedTiles([]);
   };
 
+  // 处理操作类型改变
+  const handleOperationTypeChange = (newOperationType: 'hand' | 'discard' | 'peng' | 'angang' | 'zhigang' | 'jiagang') => {
+    setOperationType(newOperationType);
+    // 如果不是直杠操作，清除被杠玩家的选择
+    if (newOperationType !== 'zhigang') {
+      setSelectedSourcePlayer(null);
+    }
+  };
+
   const playerNames = ['我', '下家', '对家', '上家']; // Player ID映射：0=我，1=下家，2=对家，3=上家
   const playerColors = ['text-blue-600', 'text-green-600', 'text-red-600', 'text-yellow-600'];
   
@@ -114,6 +125,13 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
   const displayOrder = [3, 0, 1, 2]; // 对应Player ID：上家=3，我=0，下家=1，对家=2
   const displayNames = displayOrder.map(id => playerNames[id]);
   const displayColors = displayOrder.map(id => playerColors[id]);
+
+  // 获取可选择的被杠玩家（排除当前杠牌的玩家）
+  const getAvailableSourcePlayers = () => {
+    return displayNames
+      .map((name, index) => ({ name, index }))
+      .filter(player => player.index !== selectedPlayer);
+  };
 
   // 获取操作类型的中文名称
   const getOperationName = (type: 'hand' | 'discard' | 'peng' | 'angang' | 'zhigang' | 'jiagang'): string => {
@@ -144,7 +162,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
             {/* 第一步：选择玩家 */}
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium text-gray-700 min-w-max">
-                ① 选择玩家:
+                1 选择玩家:
               </span>
               <div className="flex gap-1">
                 {displayNames.map((name, index) => (
@@ -166,11 +184,11 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
             {/* 第二步：选择操作类型 */}
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium text-gray-700 min-w-max">
-                ② 选择操作:
+                2 选择操作:
               </span>
               <div className="flex bg-gray-200 rounded-lg p-1">
                 <button
-                  onClick={() => setOperationType('hand')}
+                  onClick={() => handleOperationTypeChange('hand')}
                   className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                     operationType === 'hand'
                       ? 'bg-white text-blue-600 shadow-sm'
@@ -180,7 +198,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
                   添加手牌
                 </button>
                 <button
-                  onClick={() => setOperationType('discard')}
+                  onClick={() => handleOperationTypeChange('discard')}
                   className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                     operationType === 'discard'
                       ? 'bg-white text-blue-600 shadow-sm'
@@ -190,7 +208,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
                   弃牌
                 </button>
                 <button
-                  onClick={() => setOperationType('peng')}
+                  onClick={() => handleOperationTypeChange('peng')}
                   className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                     operationType === 'peng'
                       ? 'bg-white text-blue-600 shadow-sm'
@@ -200,7 +218,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
                   碰牌
                 </button>
                 <button
-                  onClick={() => setOperationType('angang')}
+                  onClick={() => handleOperationTypeChange('angang')}
                   className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                     operationType === 'angang'
                       ? 'bg-white text-blue-600 shadow-sm'
@@ -210,7 +228,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
                   暗杠
                 </button>
                 <button
-                  onClick={() => setOperationType('zhigang')}
+                  onClick={() => handleOperationTypeChange('zhigang')}
                   className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                     operationType === 'zhigang'
                       ? 'bg-white text-blue-600 shadow-sm'
@@ -220,7 +238,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
                   直杠
                 </button>
                 <button
-                  onClick={() => setOperationType('jiagang')}
+                  onClick={() => handleOperationTypeChange('jiagang')}
                   className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                     operationType === 'jiagang'
                       ? 'bg-white text-blue-600 shadow-sm'
@@ -232,6 +250,30 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
               </div>
             </div>
           </div>
+
+          {/* 2.1 选择被杠玩家 - 只有选择直杠时显示 */}
+          {operationType === 'zhigang' && (
+            <div className="flex items-center gap-3 pl-6 border-l-2 border-blue-200">
+              <span className="text-sm font-medium text-gray-700 min-w-max">
+                2.1 选择被杠玩家:
+              </span>
+              <div className="flex gap-1">
+                {getAvailableSourcePlayers().map(({ name, index }) => (
+                  <button
+                    key={index}
+                    onClick={() => setSelectedSourcePlayer(index)}
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      selectedSourcePlayer === index
+                        ? `bg-opacity-20 ${displayColors[index].replace('text-', 'bg-').replace('-600', '-200')} ${displayColors[index]} border-2 border-current`
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-2 border-transparent'
+                    }`}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
       
@@ -239,7 +281,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
       <div className="bg-white rounded-lg p-3 border border-gray-300 flex-1 overflow-y-auto">
         <div className="flex items-center gap-4 mb-3">
           <h3 className="text-base font-semibold text-gray-700">
-            ③ 选择麻将牌
+            3 选择麻将牌
           </h3>
           
           {/* 当前操作状态提示 */}
@@ -247,6 +289,9 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
             <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
             <span className="text-sm text-blue-700">
               当前操作: 为 <span className="font-medium">{displayNames[selectedPlayer]}</span> {getOperationName(operationType)}
+              {operationType === 'zhigang' && selectedSourcePlayer !== null && (
+                <span> (从 <span className="font-medium">{displayNames[selectedSourcePlayer]}</span>)</span>
+              )}
             </span>
           </div>
         </div>

@@ -8,7 +8,7 @@ export type CardBackStyle = 'classic' | 'elegant' | 'bamboo' | 'cloud' | 'tradit
 interface MahjongTileProps {
   tile: Tile;
   size?: 'tiny' | 'small' | 'medium' | 'large';
-  variant?: 'default' | 'selected' | 'recommended' | 'disabled' | 'back';
+  variant?: 'default' | 'selected' | 'selectedHorizontal' | 'recommended' | 'disabled' | 'disabledHorizontal' | 'back';
   onClick?: () => void;
   onDoubleClick?: () => void;
   className?: string;
@@ -59,8 +59,10 @@ const MahjongTile: React.FC<MahjongTileProps> = ({
   const variantClasses = {
     default: 'bg-white border-gray-300 text-gray-800 hover:bg-gray-50',
     selected: 'bg-blue-100 border-blue-400 text-blue-800 ring-2 ring-blue-300',
+    selectedHorizontal: 'bg-blue-100 border-blue-400 text-blue-800 ring-2 ring-blue-300',
     recommended: 'bg-green-100 border-green-400 text-green-800 ring-2 ring-green-300 animate-pulse',
     disabled: 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed',
+    disabledHorizontal: 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed',
     back: getBackVariantClasses(cardBackStyle)
   };
   
@@ -165,7 +167,8 @@ const MahjongTile: React.FC<MahjongTileProps> = ({
     variantClasses[variant],
     variant === 'back' ? '' : getTypeColor(tile.type),
     {
-      'active:scale-95': onClick && variant !== 'disabled' && variant !== 'back' && !seamless
+      'active:scale-95': onClick && variant !== 'disabled' && variant !== 'back' && !seamless,
+      'transform rotate-90': variant === 'selectedHorizontal' || variant === 'disabledHorizontal'
     },
     className
   );
@@ -190,8 +193,8 @@ const MahjongTile: React.FC<MahjongTileProps> = ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ 
-        duration: 0.3, 
-        delay: animationDelay,
+        duration: 0.01, 
+        delay: 0,
         type: "spring",
         stiffness: 120
       }}
@@ -229,6 +232,15 @@ const MahjongTile: React.FC<MahjongTileProps> = ({
       {/* 选中标识 */}
       {variant === 'selected' && (
         <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full" />
+      )}
+      
+      {/* 横向选中标识 */}
+      {variant === 'selectedHorizontal' && (
+        <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-1.5 h-0.5 bg-white rounded-full transform rotate-90" />
+          </div>
+        </div>
       )}
     </motion.div>
   );

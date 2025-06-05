@@ -8,6 +8,7 @@ export enum TileType {
 export interface Tile {
   type: TileType;
   value: number;
+  id?: string;      // 添加牌的唯一标识
 }
 
 export enum MeldType {
@@ -23,10 +24,14 @@ export enum GangType {
 }
 
 export interface Meld {
+  id?: string;      // 添加唯一标识
   type: MeldType;
   tiles: Tile[];
   exposed: boolean;
   gang_type?: GangType; // 杠牌类型（仅当type为GANG时有效）
+  source_player?: number;        // 直杠时：被杠牌的来源玩家ID
+  original_peng_id?: string;     // 加杠时：原碰牌的ID
+  timestamp?: number;            // 操作时间戳
 }
 
 export interface HandTiles {

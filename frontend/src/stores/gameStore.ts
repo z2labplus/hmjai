@@ -8,7 +8,9 @@ import {
   PlayerAction,
   TileInfo,
   MeldType,
-  Meld
+  Meld,
+  TileType,
+  GangType
 } from '../types/mahjong';
 
 interface GameStore {
