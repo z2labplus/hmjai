@@ -165,4 +165,50 @@ export const calculateRemainingTiles = (gameState: GameState): number => {
   usedTiles += gameState.discarded_tiles.length;
   
   return Math.max(0, totalTiles - usedTiles);
+};
+
+// 计算每种牌的剩余数量
+export const calculateRemainingTilesByType = (gameState: GameState): { [key: string]: number } => {
+  // 初始化每种牌的数量为4张
+  const remainingCounts: { [key: string]: number } = {};
+  
+  // 万子 1-9
+  for (let i = 1; i <= 9; i++) {
+    remainingCounts[`${TileType.WAN}-${i}`] = 4;
+  }
+  
+  // 条子 1-9  
+  for (let i = 1; i <= 9; i++) {
+    remainingCounts[`${TileType.TIAO}-${i}`] = 4;
+  }
+  
+  // 筒子 1-9
+  for (let i = 1; i <= 9; i++) {
+    remainingCounts[`${TileType.TONG}-${i}`] = 4;
+  }
+  
+  // 收集所有已使用的牌
+  const usedTiles: Tile[] = [];
+  
+  // 收集所有玩家的手牌
+  Object.values(gameState.player_hands).forEach(hand => {
+    usedTiles.push(...hand.tiles);
+    // 收集碰牌杠牌
+    hand.melds.forEach(meld => {
+      usedTiles.push(...meld.tiles);
+    });
+  });
+  
+  // 收集弃牌
+  usedTiles.push(...gameState.discarded_tiles);
+  
+  // 减去已使用的牌
+  usedTiles.forEach(tile => {
+    const key = `${tile.type}-${tile.value}`;
+    if (remainingCounts[key] !== undefined) {
+      remainingCounts[key] = Math.max(0, remainingCounts[key] - 1);
+    }
+  });
+  
+  return remainingCounts;
 }; 

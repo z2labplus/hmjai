@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useGameStore, selectMyHand, selectDiscardedTiles } from '../stores/gameStore';
-import { Tile, TileType, createTile, tileToString, tilesEqual, Meld, MeldType, GangType } from '../types/mahjong';
+import { Tile, TileType, createTile, tileToString, tilesEqual, Meld, MeldType, GangType, calculateRemainingTilesByType } from '../types/mahjong';
 import MahjongTile from './MahjongTile';
 import MahjongTable from './MahjongTable';
 import { CardBackStyle } from './MahjongTile';
@@ -14,12 +14,16 @@ interface GameBoardProps {
 const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elegant' }) => {
   const myHand = useGameStore(selectMyHand());
   const discardedTiles = useGameStore(selectDiscardedTiles());
+  const gameState = useGameStore(state => state.gameState);
   const { addTileToHand, removeTileFromHand, addDiscardedTile, addMeld } = useGameStore();
   
   const [selectedTiles, setSelectedTiles] = useState<Tile[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState<number>(0); // 默认选择上家（显示索引0）
   const [operationType, setOperationType] = useState<'hand' | 'discard' | 'peng' | 'angang' | 'zhigang' | 'jiagang'>('hand');
   const [selectedSourcePlayer, setSelectedSourcePlayer] = useState<number | null>(null); // 新增：被杠玩家选择
+  
+  // 计算每种牌的剩余数量
+  const remainingTilesByType = calculateRemainingTilesByType(gameState);
   
   // 所有可选的牌
   const availableTiles: Tile[] = [];
@@ -144,6 +148,12 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
       'jiagang': '加杠'
     };
     return operationMap[type] || type;
+  };
+
+  // 获取指定牌的剩余数量
+  const getTileRemainingCount = (tile: Tile): number => {
+    const key = `${tile.type}-${tile.value}`;
+    return remainingTilesByType[key] || 0;
   };
 
   return (
@@ -299,19 +309,27 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
         {/* 所有麻将牌一列显示 */}
         <div>
           <div className="flex gap-0.5 flex-wrap">
-            {availableTiles.map((tile, index) => {
-              return (
-                <MahjongTile
-                  key={`tile-${tile.type}-${tile.value}`}
-                  tile={tile}
-                  size="small"
-                  variant="default"
-                  onClick={() => handleTileClick(tile)}
-                  animationDelay={index * 0.02}
-                  cardBackStyle={cardBackStyle}
-                />
-              );
-            })}
+            {availableTiles
+              .filter(tile => {
+                // 只显示剩余数量大于0的牌
+                const remainingCount = getTileRemainingCount(tile);
+                return remainingCount > 0;
+              })
+              .map((tile, index) => {
+                const remainingCount = getTileRemainingCount(tile);
+                return (
+                  <MahjongTile
+                    key={`tile-${tile.type}-${tile.value}`}
+                    tile={tile}
+                    size="small"
+                    variant="default"
+                    onClick={() => handleTileClick(tile)}
+                    animationDelay={index * 0.02}
+                    cardBackStyle={cardBackStyle}
+                    remainingCount={remainingCount}
+                  />
+                );
+              })}
           </div>
         </div>
       </div>

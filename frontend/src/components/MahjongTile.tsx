@@ -17,6 +17,7 @@ interface MahjongTileProps {
   seamless?: boolean;
   direction?: 'horizontal' | 'vertical';
   cardBackStyle?: CardBackStyle;
+  remainingCount?: number;
 }
 
 const MahjongTile: React.FC<MahjongTileProps> = ({
@@ -30,7 +31,8 @@ const MahjongTile: React.FC<MahjongTileProps> = ({
   animationDelay = 0,
   seamless = false,
   direction = 'horizontal',
-  cardBackStyle = 'elegant'
+  cardBackStyle = 'elegant',
+  remainingCount
 }) => {
   const tileText = tileToString(tile);
   
@@ -211,6 +213,13 @@ const MahjongTile: React.FC<MahjongTileProps> = ({
         <span className="relative z-10 font-black">
           {tileText}
         </span>
+      )}
+      
+      {/* 剩余数量显示 - 只有当数量大于0且不是背面时显示 */}
+      {remainingCount !== undefined && remainingCount > 0 && variant !== 'back' && (
+        <div className="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 text-white text-xs font-bold rounded-full flex items-center justify-center z-20">
+          {remainingCount}
+        </div>
       )}
       
       {/* 推荐标识 */}

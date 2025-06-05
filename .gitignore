@@ -1,5 +1,8 @@
+frontend/node_modules/      # 前端项目依赖
 node_modules/      # 前端项目依赖
+frontend/dist/              # 编译输出目录
 dist/              # 编译输出目录
+frontend/build/             # 构建目录
 build/             # 构建目录
 .idea/             # IntelliJ IDEA 配置
 .vscode/           # VS Code 配置
@@ -11,3 +14,4 @@ build/             # 构建目录
 *.zip
 Redis-x64-3.2.100/
 *.mkv
+**/node_modules/
