@@ -12,6 +12,7 @@ import {
   TileType,
   GangType
 } from '../types/mahjong';
+import MahjongApiClient from '../services/apiClient';
 
 interface GameStore {
   // 游戏状态
@@ -26,6 +27,10 @@ interface GameStore {
   isConnected: boolean;
   connectionId: string | null;
   
+  // API连接状态
+  isApiConnected: boolean;
+  lastSyncTime: Date | null;
+  
   // Actions
   setGameState: (gameState: GameState) => void;
   setAnalysisResult: (result: AnalysisResult) => void;
@@ -36,32 +41,41 @@ interface GameStore {
   // 游戏操作
   addTileToHand: (playerId: number, tile: Tile) => void;
   removeTileFromHand: (playerId: number, tile: Tile) => void;
-  addDiscardedTile: (tile: Tile, playerId?: number) => void;
+  reduceHandTilesCount: (playerId: number, count: number, preferredTile?: Tile) => void;
+  addDiscardedTile: (tile: Tile, playerId: number) => void;
   addMeld: (playerId: number, meld: Meld) => void;
+  reorderPlayerHand: (playerId: number, newTiles: Tile[]) => void;
   addAction: (action: PlayerAction) => void;
+  
+  // API同步功能
+  syncFromBackend: () => Promise<void>;
+  syncToBackend: () => Promise<void>;
+  setApiConnectionStatus: (connected: boolean) => void;
   
   // 重置功能
   resetGame: () => void;
   clearAnalysis: () => void;
 }
 
+// 初始游戏状态
 const initialGameState: GameState = {
+  game_id: '',
   player_hands: {
-    0: { tiles: [], melds: [] },
-    1: { tiles: [], melds: [] },
-    2: { tiles: [], melds: [] },
-    3: { tiles: [], melds: [] }
+    '0': { tiles: [], melds: [] },
+    '1': { tiles: [], melds: [] },
+    '2': { tiles: [], melds: [] },
+    '3': { tiles: [], melds: [] }
   },
+  current_player: 0,
   discarded_tiles: [],
   player_discarded_tiles: {
-    0: [],
-    1: [],
-    2: [],
-    3: []
+    '0': [],
+    '1': [],
+    '2': [],
+    '3': []
   },
-  remaining_tiles: [],
-  current_player: 0,
-  actions_history: []
+  actions_history: [],
+  game_started: false
 };
 
 export const useGameStore = create<GameStore>()(
@@ -73,6 +87,10 @@ export const useGameStore = create<GameStore>()(
     availableTiles: [],
     isConnected: false,
     connectionId: null,
+    
+    // API状态初始化
+    isApiConnected: false,
+    lastSyncTime: null,
     
     // Setters
     setGameState: (gameState) => set({ gameState }),
@@ -115,6 +133,40 @@ export const useGameStore = create<GameStore>()(
       
       return { gameState: newGameState };
     }),
+
+    reduceHandTilesCount: (playerId, count, preferredTile) => set((state) => {
+      const newGameState = { ...state.gameState };
+      const playerHand = { ...newGameState.player_hands[playerId] };
+      let tiles = [...playerHand.tiles];
+      
+      // 确保手牌足够
+      while (tiles.length < count) {
+        // 如果手牌不够，添加通用牌
+        const genericTile = { type: 'wan' as TileType, value: 1 };
+        tiles.push(genericTile);
+      }
+      
+      // 减少指定数量的牌
+      for (let i = 0; i < count && tiles.length > 0; i++) {
+        if (preferredTile) {
+          // 优先移除指定类型的牌
+          const preferredIndex = tiles.findIndex(tile => 
+            tile.type === preferredTile.type && tile.value === preferredTile.value
+          );
+          if (preferredIndex !== -1) {
+            tiles.splice(preferredIndex, 1);
+            continue;
+          }
+        }
+        // 移除第一张牌
+        tiles.shift();
+      }
+      
+      playerHand.tiles = tiles;
+      newGameState.player_hands[playerId] = playerHand;
+      
+      return { gameState: newGameState };
+    }),
     
     addDiscardedTile: (tile, playerId = 0) => set((state) => {
       const newGameState = { ...state.gameState };
@@ -149,6 +201,17 @@ export const useGameStore = create<GameStore>()(
       return { gameState: newGameState };
     }),
     
+    // 重新排序玩家手牌
+    reorderPlayerHand: (playerId, newTiles) => set((state) => {
+      const newGameState = { ...state.gameState };
+      const playerIdStr = playerId.toString();
+      newGameState.player_hands[playerIdStr] = {
+        ...newGameState.player_hands[playerIdStr],
+        tiles: newTiles
+      };
+      return { gameState: newGameState };
+    }),
+    
     addAction: (action) => set((state) => {
       const newGameState = { ...state.gameState };
       newGameState.actions_history = [...newGameState.actions_history, action];
@@ -162,7 +225,42 @@ export const useGameStore = create<GameStore>()(
       isAnalyzing: false
     }),
     
-    clearAnalysis: () => set({ analysisResult: null })
+    clearAnalysis: () => set({ analysisResult: null }),
+    
+    // API同步功能实现
+    syncFromBackend: async () => {
+      try {
+        const backendState = await MahjongApiClient.getGameState();
+        set({
+          gameState: backendState,
+          isApiConnected: true,
+          lastSyncTime: new Date()
+        });
+        console.log('✅ 从后端同步状态成功');
+      } catch (error) {
+        console.error('❌ 从后端同步状态失败:', error);
+        set({ isApiConnected: false });
+      }
+    },
+    
+    syncToBackend: async () => {
+      try {
+        const currentState = get().gameState;
+        await MahjongApiClient.setGameState(currentState);
+        set({
+          isApiConnected: true,
+          lastSyncTime: new Date()
+        });
+        console.log('✅ 同步状态到后端成功');
+      } catch (error) {
+        console.error('❌ 同步状态到后端失败:', error);
+        set({ isApiConnected: false });
+      }
+    },
+    
+    setApiConnectionStatus: (connected: boolean) => {
+      set({ isApiConnected: connected });
+    }
   }))
 );
 

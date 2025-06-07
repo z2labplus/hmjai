@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGameStore, selectPlayerHand } from '../stores/gameStore';
-import { Tile, MeldType, GangType, calculateRemainingTiles } from '../types/mahjong';
+import { calculateRemainingTiles, calculateRemainingTilesByType, TileType } from '../types/mahjong';
+import { Tile, MeldType, GangType } from '../types/mahjong';
 import MahjongTile from './MahjongTile';
 import SimpleSourceIndicator from './SimpleSourceIndicator';
 import { CardBackStyle } from './MahjongTile';
@@ -13,22 +14,166 @@ interface MahjongTableProps {
 
 const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 'elegant' }) => {
   const gameState = useGameStore(state => state.gameState);
-  const player0Hand = useGameStore(selectPlayerHand(0));
-  const player1Hand = useGameStore(selectPlayerHand(1));
-  const player2Hand = useGameStore(selectPlayerHand(2));
-  const player3Hand = useGameStore(selectPlayerHand(3));
+  const { reorderPlayerHand, removeTileFromHand, addDiscardedTile } = useGameStore(state => ({
+    reorderPlayerHand: state.reorderPlayerHand,
+    removeTileFromHand: state.removeTileFromHand,
+    addDiscardedTile: state.addDiscardedTile
+  }));
   
-  const player0Discards = useGameStore(state => state.gameState.player_discarded_tiles?.[0] || []);
-  const player1Discards = useGameStore(state => state.gameState.player_discarded_tiles?.[1] || []);
-  const player2Discards = useGameStore(state => state.gameState.player_discarded_tiles?.[2] || []);
-  const player3Discards = useGameStore(state => state.gameState.player_discarded_tiles?.[3] || []);
+  // 获取玩家手牌，如果不存在则返回空数组
+  const getPlayerHand = (playerId: number) => {
+    const playerIdStr = playerId.toString();
+    return gameState.player_hands[playerIdStr] || { tiles: [], melds: [] };
+  };
+  
+  const player0Hand = getPlayerHand(0);
+  const player1Hand = getPlayerHand(1);
+  const player2Hand = getPlayerHand(2);
+  const player3Hand = getPlayerHand(3);
+  
+  // 获取玩家弃牌，如果不存在则返回空数组
+  const getPlayerDiscards = (playerId: number) => {
+    const playerIdStr = playerId.toString();
+    return gameState.player_discarded_tiles?.[playerIdStr] || [];
+  };
+  
+  const player0Discards = getPlayerDiscards(0);
+  const player1Discards = getPlayerDiscards(1);
+  const player2Discards = getPlayerDiscards(2);
+  const player3Discards = getPlayerDiscards(3);
 
+  // 拖拽状态管理
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  // 剩余牌数：使用原有逻辑（108 - 所有已使用的牌）
   const remainingTiles = calculateRemainingTiles(gameState);
+  
+  // 计算未出牌数：所有可见麻将牌的剩余数量之和（基于可见牌逻辑）
+  const calculateUnplayedTiles = (): number => {
+    const remainingTilesByType = calculateRemainingTilesByType(gameState);
+    let unplayedTotal = 0;
+    
+    // 万子 1-9
+    for (let i = 1; i <= 9; i++) {
+      const count = remainingTilesByType[`${TileType.WAN}-${i}`] || 0;
+      if (count > 0) {
+        unplayedTotal += count;
+      }
+    }
+    
+    // 条子 1-9
+    for (let i = 1; i <= 9; i++) {
+      const count = remainingTilesByType[`${TileType.TIAO}-${i}`] || 0;
+      if (count > 0) {
+        unplayedTotal += count;
+      }
+    }
+    
+    // 筒子 1-9
+    for (let i = 1; i <= 9; i++) {
+      const count = remainingTilesByType[`${TileType.TONG}-${i}`] || 0;
+      if (count > 0) {
+        unplayedTotal += count;
+      }
+    }
+    
+    return unplayedTotal;
+  };
+  
+  // 未出牌数：等于选择区域中显示的所有牌的右上角数字之和
+  const unplayedTiles = calculateUnplayedTiles();
+  
   const playerNames = ['我', '下家', '对家', '上家'];
   const playerColors = ['bg-blue-50 border-blue-200', 'bg-green-50 border-green-200', 'bg-red-50 border-red-200', 'bg-yellow-50 border-yellow-200'];
   
   // 展示顺序：上家、我、下家、对家
   const displayOrder = [3, 0, 1, 2];
+
+  // 拖拽事件处理函数
+  const handleDragStart = (e: React.DragEvent, index: number, playerId: number) => {
+    // 只允许"我"（playerId=0）的手牌拖拽
+    if (playerId !== 0) {
+      e.preventDefault();
+      return;
+    }
+    
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', index.toString());
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number, playerId: number) => {
+    if (playerId !== 0 || draggedIndex === null) {
+      return;
+    }
+    
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverIndex(index);
+  };
+
+  const handleDragEnter = (e: React.DragEvent, index: number, playerId: number) => {
+    if (playerId !== 0) {
+      return;
+    }
+    
+    e.preventDefault();
+    setDragOverIndex(index);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // 只有当鼠标真正离开组件时才清除dragOverIndex
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      setDragOverIndex(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number, playerId: number) => {
+    if (playerId !== 0 || draggedIndex === null) {
+      return;
+    }
+    
+    e.preventDefault();
+    
+    const playerHand = [player0Hand, player1Hand, player2Hand, player3Hand][playerId];
+    const newTiles = [...playerHand.tiles];
+    
+    // 移动牌到新位置
+    const draggedTile = newTiles[draggedIndex];
+    newTiles.splice(draggedIndex, 1);
+    newTiles.splice(targetIndex, 0, draggedTile);
+    
+    // 更新游戏状态
+    reorderPlayerHand(playerId, newTiles);
+    
+    // 重置拖拽状态
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  // 双击事件处理函数 - 弃牌
+  const handleTileDoubleClick = (tile: Tile, index: number, playerId: number) => {
+    // 只允许"我"（playerId=0）的手牌双击弃牌
+    if (playerId !== 0) {
+      return;
+    }
+    
+    // 从手牌中移除
+    removeTileFromHand(playerId, tile);
+    
+    // 添加到弃牌堆
+    addDiscardedTile(tile, playerId);
+  };
 
   // 渲染弃牌组（不换行，一行显示）
   const renderDiscardGroup = (tiles: Tile[], prefix: string) => {
@@ -51,6 +196,11 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
     );
   };
 
+  // 计算碰杠牌的总张数
+  const calculateMeldTilesCount = (melds: any[]) => {
+    return melds.reduce((total, meld) => total + meld.tiles.length, 0);
+  };
+
   // 渲染单个玩家区域
   const renderPlayerArea = (playerId: number) => {
     const hand = [player0Hand, player1Hand, player2Hand, player3Hand][playerId];
@@ -63,7 +213,7 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
           <div className="flex items-center gap-2">
             <h3 className="text-lg font-bold text-gray-800">{playerNames[playerId]}</h3>
             <div className="text-sm text-gray-600">
-              (手牌: {hand.tiles.length} | 碰杠: {hand.melds.length} | 弃牌: {discards.length}
+              (手牌: {hand.tiles.length} | 碰杠: {calculateMeldTilesCount(hand.melds)} | 弃牌: {discards.length})
             </div>
           </div>
         </div>
@@ -76,16 +226,44 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
               {/* 手牌区域 */}
               {hand.tiles.length > 0 && (
                 <div style={{ display: 'flex' }}>
-                  {hand.tiles.map((tile: Tile, index: number) => (
-                    <MahjongTile
-                      key={`player-${playerId}-hand-${index}`}
-                      tile={tile}
-                      size="small"
-                      variant={playerId === 0 ? "default" : "back"}
-                      seamless={true}
-                      cardBackStyle={cardBackStyle}
-                    />
-                  ))}
+                  {hand.tiles.map((tile: Tile, index: number) => {
+                    const isDragging = draggedIndex === index && playerId === 0;
+                    const isDragOver = dragOverIndex === index && playerId === 0;
+                    
+                    return (
+                      <div
+                        key={`player-${playerId}-hand-${index}`}
+                        draggable={playerId === 0} // 只有"我"的手牌可以拖拽
+                        onDragStart={(e) => handleDragStart(e, index, playerId)}
+                        onDragOver={(e) => handleDragOver(e, index, playerId)}
+                        onDragEnter={(e) => handleDragEnter(e, index, playerId)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, index, playerId)}
+                        onDragEnd={handleDragEnd}
+                        onDoubleClick={() => handleTileDoubleClick(tile, index, playerId)} // 添加双击事件
+                        className={`transition-all duration-200 ${
+                          playerId === 0 ? 'cursor-grab active:cursor-grabbing hover:cursor-pointer' : ''
+                        } ${
+                          isDragging ? 'opacity-50 scale-105' : ''
+                        } ${
+                          isDragOver ? 'transform scale-110' : ''
+                        }`}
+                        style={{
+                          transform: isDragOver ? 'translateY(-4px)' : 'none',
+                          filter: isDragging ? 'brightness(1.1)' : 'none'
+                        }}
+                        title={playerId === 0 ? "拖拽重排 | 双击弃牌" : ""} // 添加提示文字
+                      >
+                        <MahjongTile
+                          tile={tile}
+                          size="small"
+                          variant={playerId === 0 ? "default" : "back"}
+                          seamless={true}
+                          cardBackStyle={cardBackStyle}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               )}
               
@@ -152,6 +330,17 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
                                 className="absolute -top-1 -right-1"
                               />
                             )}
+                            
+                            {/* 碰牌来源指示器 - 只在第3张牌上显示 */}
+                            {meld.type === MeldType.PENG && 
+                             tileIndex === 2 && 
+                             meld.source_player !== undefined && (
+                              <SimpleSourceIndicator
+                                sourcePlayer={meld.source_player}
+                                currentPlayer={playerId}
+                                className="absolute -top-1 -right-1"
+                              />
+                            )}
                           </div>
                         );
                       })}
@@ -175,18 +364,34 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
 
   return (
     <div className={`bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-2 ${className}`}>
-      {/* 标题和剩余牌数 - 同一行显示 */}
+      {/* 标题和统计信息 - 同一行显示 */}
       <div className="flex items-center justify-between mb-1">
         <h2 className="text-2xl font-bold text-gray-800">血战到底</h2>
-        <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2 shadow-sm border">
-          <span className="text-sm text-gray-600">剩余牌数:</span>
-          <motion.div
-            animate={{ scale: [1, 1.05, 1] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-            className="text-xl font-bold text-green-600"
-          >
-            {remainingTiles}
-          </motion.div>
+        <div className="flex flex-col items-end gap-1">
+        <div className="flex items-center gap-4">
+          {/* 未出牌数 */}
+          <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2 shadow-sm border">
+            <span className="text-sm text-gray-600">未出牌数:</span>
+            <motion.div
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+              className="text-xl font-bold text-blue-600"
+            >
+              {unplayedTiles}
+            </motion.div>
+          </div>
+          {/* 剩余牌数 */}
+          <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2 shadow-sm border">
+            <span className="text-sm text-gray-600">剩余牌数:</span>
+            <motion.div
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+              className="text-xl font-bold text-green-600"
+            >
+              {remainingTiles}
+            </motion.div>
+            </div>
+          </div>
         </div>
       </div>
 

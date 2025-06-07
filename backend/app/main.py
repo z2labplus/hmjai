@@ -1,28 +1,25 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 
-from .api.mahjong import router as mahjong_router
-
 # 创建FastAPI应用
-app = FastAPI(
-    title="欢乐麻将辅助工具 API",
-    description="智能麻将分析和辅助决策系统",
-    version="1.0.0"
-)
+app = FastAPI()
 
 # 配置CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 生产环境应该限制具体域名
+    allow_origins=["*"],  # 在生产环境中应该设置具体的域名
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# 导入路由
+from .api import mahjong
+
 # 注册路由
-app.include_router(mahjong_router)
+app.include_router(mahjong.router, prefix="/api/mahjong", tags=["mahjong"])
 
 # 静态文件服务（如果需要）
 if os.path.exists("static"):
@@ -33,7 +30,7 @@ if os.path.exists("static"):
 async def root():
     """根路径"""
     return {
-        "message": "欢乐麻将辅助工具 API",
+        "message": "血战麻将游戏服务器",
         "version": "1.0.0",
         "docs": "/docs",
         "health": "/health"

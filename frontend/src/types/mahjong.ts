@@ -47,12 +47,20 @@ export interface PlayerAction {
 }
 
 export interface GameState {
-  player_hands: { [key: number]: HandTiles };
-  discarded_tiles: Tile[];
-  player_discarded_tiles?: { [key: number]: Tile[] };
-  remaining_tiles: Tile[];
+  game_id: string;
+  player_hands: {
+    [key: string]: {
+      tiles: Tile[];
+      melds: Meld[];
+    }
+  };
   current_player: number;
-  actions_history: PlayerAction[];
+  discarded_tiles: Tile[];
+  player_discarded_tiles: {
+    [key: string]: Tile[];
+  };
+  actions_history: any[];
+  game_started: boolean;
 }
 
 export interface AnalysisResult {
@@ -145,17 +153,17 @@ export const tilesEqual = (tile1: Tile, tile2: Tile): boolean => {
   return tile1.type === tile2.type && tile1.value === tile2.value;
 };
 
-// 计算剩余牌数
+// 计算剩余牌数（原有逻辑：计算所有已使用的牌）
 export const calculateRemainingTiles = (gameState: GameState): number => {
-  const totalTiles = 144; // 标准麻将总牌数
+  const totalTiles = 108; // 标准麻将总牌数
   
   // 计算已使用的牌数
   let usedTiles = 0;
   
-  // 计算所有玩家手牌数量
+  // 计算所有玩家手牌数量（所有玩家的手牌都计算）
   Object.values(gameState.player_hands).forEach(hand => {
     usedTiles += hand.tiles.length;
-    // 计算碰牌杠牌数量
+    // 计算碰牌杠牌数量（所有碰杠都计算）
     hand.melds.forEach(meld => {
       usedTiles += meld.tiles.length;
     });
@@ -167,8 +175,46 @@ export const calculateRemainingTiles = (gameState: GameState): number => {
   return Math.max(0, totalTiles - usedTiles);
 };
 
-// 计算每种牌的剩余数量
+// 计算基于可见牌的剩余牌数（用于未出牌数计算）
+export const calculateVisibleRemainingTiles = (gameState: GameState): number => {
+  const totalTiles = 108; // 标准麻将总牌数
+  
+  // 计算已使用的可见牌数
+  let usedTiles = 0;
+  
+  // 计算所有玩家手牌数量
+  Object.entries(gameState.player_hands).forEach(([playerIdStr, hand]) => {
+    const playerId = parseInt(playerIdStr);
+    
+    // 只计算"我"（playerId=0）的手牌，其他玩家的手牌不可见
+    if (playerId === 0) {
+      usedTiles += hand.tiles.length;
+    }
+    
+    // 计算碰牌杠牌数量
+    hand.melds.forEach(meld => {
+      if (meld.type === MeldType.GANG && meld.gang_type === GangType.AN_GANG) {
+        // 暗杠：只计算"我"的暗杠，其他玩家的暗杠不可见
+        if (playerId === 0) {
+          usedTiles += meld.tiles.length;
+        }
+      } else {
+        // 明牌（碰牌、明杠）：所有玩家的都要计算
+        usedTiles += meld.tiles.length;
+      }
+    });
+  });
+  
+  // 计算弃牌数量 - 所有玩家的弃牌都是可见的
+  usedTiles += gameState.discarded_tiles.length;
+  
+  return Math.max(0, totalTiles - usedTiles);
+};
+
+// 计算每种牌的剩余数量（基于可见牌）
 export const calculateRemainingTilesByType = (gameState: GameState): { [key: string]: number } => {
+  console.log('🔍 开始计算剩余牌数...');
+  
   // 初始化每种牌的数量为4张
   const remainingCounts: { [key: string]: number } = {};
   
@@ -187,28 +233,70 @@ export const calculateRemainingTilesByType = (gameState: GameState): { [key: str
     remainingCounts[`${TileType.TONG}-${i}`] = 4;
   }
   
-  // 收集所有已使用的牌
+  console.log('📦 初始牌数:', remainingCounts);
+  
+  // 收集所有已使用的可见牌
   const usedTiles: Tile[] = [];
   
-  // 收集所有玩家的手牌
-  Object.values(gameState.player_hands).forEach(hand => {
-    usedTiles.push(...hand.tiles);
+  // 收集玩家的手牌和碰杠牌
+  Object.entries(gameState.player_hands).forEach(([playerIdStr, hand]) => {
+    const playerId = parseInt(playerIdStr);
+    
+    console.log(`🏠 处理玩家${playerId}:`, {
+      手牌数量: hand.tiles.length,
+      碰杠数量: hand.melds.length
+    });
+    
+    // 只收集"我"（playerId=0）的手牌，其他玩家的手牌不可见
+    if (playerId === 0) {
+      console.log('👤 收集我的手牌:', hand.tiles.map(t => `${t.value}${t.type}`));
+      usedTiles.push(...hand.tiles);
+    }
+    
     // 收集碰牌杠牌
-    hand.melds.forEach(meld => {
-      usedTiles.push(...meld.tiles);
+    hand.melds.forEach((meld, meldIndex) => {
+      console.log(`🎴 处理玩家${playerId}的第${meldIndex}个碰杠:`, {
+        类型: meld.type,
+        杠牌类型: meld.gang_type,
+        是否明牌: meld.exposed,
+        牌数量: meld.tiles.length,
+        牌内容: meld.tiles.map(t => `${t.value}${t.type}`)
+      });
+      
+      if (meld.type === MeldType.GANG && meld.gang_type === GangType.AN_GANG) {
+        // 暗杠：只收集"我"的暗杠，其他玩家的暗杠不可见
+        if (playerId === 0) {
+          console.log('🔒 收集我的暗杠牌');
+          usedTiles.push(...meld.tiles);
+        } else {
+          console.log('🔒 跳过其他玩家的暗杠牌');
+        }
+      } else {
+        // 明牌（碰牌、明杠）：所有玩家的都要收集
+        console.log('👁️ 收集明牌:', meld.tiles.map(t => `${t.value}${t.type}`));
+        usedTiles.push(...meld.tiles);
+      }
     });
   });
   
-  // 收集弃牌
+  // 收集弃牌 - 所有玩家的弃牌都是可见的
+  console.log('🗑️ 收集弃牌:', gameState.discarded_tiles.map(t => `${t.value}${t.type}`));
   usedTiles.push(...gameState.discarded_tiles);
+  
+  console.log('📊 所有已使用的牌:', usedTiles.map(t => `${t.value}${t.type}`));
   
   // 减去已使用的牌
   usedTiles.forEach(tile => {
     const key = `${tile.type}-${tile.value}`;
+    console.log(`🔢 处理牌 ${tile.value}${tile.type}, key: ${key}, 当前剩余: ${remainingCounts[key]}`);
     if (remainingCounts[key] !== undefined) {
       remainingCounts[key] = Math.max(0, remainingCounts[key] - 1);
+      console.log(`  ➡️ 减少后剩余: ${remainingCounts[key]}`);
+    } else {
+      console.warn(`  ⚠️ 未知的牌类型key: ${key}`);
     }
   });
   
+  console.log('✅ 最终剩余牌数:', remainingCounts);
   return remainingCounts;
 }; 

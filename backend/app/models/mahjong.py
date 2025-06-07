@@ -1,23 +1,44 @@
 from enum import Enum
-from typing import List, Optional, Dict, Set
+from typing import List, Optional, Dict, Set, Any
 from pydantic import BaseModel, Field
+from datetime import datetime
 
 
-class TileType(Enum):
+class TileType(str, Enum):
     """麻将牌类型"""
-    WAN = "wan"      # 万
-    TIAO = "tiao"    # 条
-    TONG = "tong"    # 筒
-    ZI = "zi"        # 字牌
+    WAN = "wan"    # 万
+    TIAO = "tiao"  # 条
+    TONG = "tong"  # 筒
+
+
+class MeldType(str, Enum):
+    """面子类型"""
+    PENG = "peng"  # 碰
+    GANG = "gang"  # 杠
+    CHI = "chi"    # 吃
+
+
+class GangType(str, Enum):
+    """杠牌类型"""
+    MING_GANG = "ming_gang"  # 明杠（直杠）
+    AN_GANG = "an_gang"      # 暗杠
+    JIA_GANG = "jia_gang"    # 加杠
 
 
 class Tile(BaseModel):
     """麻将牌"""
     type: TileType
     value: int = Field(..., ge=1, le=9)  # 1-9
+    id: Optional[str] = None  # 牌的唯一标识
     
-    def __str__(self):
-        return f"{self.value}{self.type.value}"
+    def __str__(self) -> str:
+        """转换为字符串表示"""
+        type_map = {
+            TileType.WAN: "万",
+            TileType.TIAO: "条",
+            TileType.TONG: "筒"
+        }
+        return f"{self.value}{type_map[self.type]}"
     
     @classmethod
     def from_code(cls, code: int) -> "Tile":
@@ -28,8 +49,6 @@ class Tile(BaseModel):
             return cls(type=TileType.TIAO, value=code - 10)
         elif 21 <= code <= 29:
             return cls(type=TileType.TONG, value=code - 20)
-        elif 31 <= code <= 37:
-            return cls(type=TileType.ZI, value=code - 30)
         else:
             raise ValueError(f"Invalid tile code: {code}")
     
@@ -41,49 +60,46 @@ class Tile(BaseModel):
             return self.value + 10
         elif self.type == TileType.TONG:
             return self.value + 20
-        elif self.type == TileType.ZI:
-            return self.value + 30
-
-
-class MeldType(Enum):
-    """组合类型"""
-    PENG = "peng"    # 碰
-    GANG = "gang"    # 杠
-    CHI = "chi"      # 吃
+        else:
+            raise ValueError(f"Invalid tile type: {self.type}")
 
 
 class Meld(BaseModel):
-    """牌组合（碰、杠、吃）"""
+    """面子"""
+    id: Optional[str] = None  # 面子的唯一标识
     type: MeldType
     tiles: List[Tile]
-    exposed: bool = True  # 是否明牌
+    exposed: bool = True
+    gang_type: Optional[GangType] = None  # 杠牌类型
+    source_player: Optional[int] = None  # 来源玩家ID
+    original_peng_id: Optional[str] = None  # 加杠时原碰牌ID
+    timestamp: Optional[float] = Field(default_factory=lambda: datetime.now().timestamp())
 
 
 class HandTiles(BaseModel):
-    """手牌"""
+    """玩家手牌"""
     tiles: List[Tile] = []
     melds: List[Meld] = []
-    
-    def tile_count(self) -> int:
-        """总牌数"""
-        return len(self.tiles) + sum(len(meld.tiles) for meld in self.melds)
 
 
 class PlayerAction(BaseModel):
     """玩家动作"""
     player_id: int
-    action_type: str  # "draw", "discard", "peng", "gang", "chi"
+    action_type: str
     tiles: List[Tile]
-    timestamp: Optional[float] = None
+    timestamp: Optional[float] = Field(default_factory=lambda: datetime.now().timestamp())
 
 
 class GameState(BaseModel):
     """游戏状态"""
-    player_hands: Dict[int, HandTiles] = {}  # 玩家手牌
-    discarded_tiles: List[Tile] = []         # 弃牌池
-    remaining_tiles: List[Tile] = []         # 剩余牌
+    game_id: str
+    player_hands: Dict[str, HandTiles] = {}
     current_player: int = 0
+    discarded_tiles: List[Tile] = []
+    player_discarded_tiles: Dict[str, List[Tile]] = {}
     actions_history: List[PlayerAction] = []
+    game_started: bool = False
+    last_action: Optional[Dict[str, Any]] = None
     
     def get_visible_tiles(self) -> List[Tile]:
         """获取所有可见的牌"""
@@ -97,30 +113,86 @@ class GameState(BaseModel):
         
         return visible
     
-    def calculate_remaining_tiles(self) -> Dict[int, int]:
-        """计算剩余牌数量"""
-        # 初始化所有牌的数量（每种牌4张）
-        all_tiles = {}
-        for code in range(1, 10):  # 万
-            all_tiles[code] = 4
-        for code in range(11, 20):  # 条
-            all_tiles[code] = 4
-        for code in range(21, 30):  # 筒
-            all_tiles[code] = 4
-        for code in range(31, 38):  # 字牌
-            all_tiles[code] = 4
+    def calculate_remaining_tiles(self) -> int:
+        """计算剩余牌数（包括所有已使用的牌）"""
+        total_tiles = 108  # 标准麻将总牌数
+        used_tiles = 0
         
-        # 减去已知的牌
-        visible_tiles = self.get_visible_tiles()
+        # 计算所有玩家手牌数量
         for hand in self.player_hands.values():
-            visible_tiles.extend(hand.tiles)
+            used_tiles += len(hand.tiles)
+            # 计算碰牌杠牌数量
+            for meld in hand.melds:
+                used_tiles += len(meld.tiles)
         
-        for tile in visible_tiles:
-            code = tile.to_code()
-            if code in all_tiles:
-                all_tiles[code] = max(0, all_tiles[code] - 1)
+        # 计算弃牌数量
+        used_tiles += len(self.discarded_tiles)
         
-        return all_tiles
+        return max(0, total_tiles - used_tiles)
+
+    def calculate_visible_remaining_tiles(self) -> int:
+        """计算基于可见牌的剩余牌数"""
+        total_tiles = 108
+        used_tiles = 0
+        
+        # 计算所有玩家手牌数量
+        for player_id, hand in self.player_hands.items():
+            # 只计算"我"（player_id=0）的手牌
+            if player_id == "0":
+                used_tiles += len(hand.tiles)
+            
+            # 计算碰牌杠牌数量
+            for meld in hand.melds:
+                if meld.type == MeldType.GANG and meld.gang_type == GangType.AN_GANG:
+                    # 暗杠：只计算"我"的暗杠
+                    if player_id == "0":
+                        used_tiles += len(meld.tiles)
+                else:
+                    # 明牌（碰牌、明杠）：所有玩家的都要计算
+                    used_tiles += len(meld.tiles)
+        
+        # 计算弃牌数量 - 所有玩家的弃牌都是可见的
+        used_tiles += len(self.discarded_tiles)
+        
+        return max(0, total_tiles - used_tiles)
+
+    def calculate_remaining_tiles_by_type(self) -> Dict[str, int]:
+        """计算每种牌的剩余数量（基于可见牌）"""
+        # 初始化每种牌的数量为4张
+        remaining_counts = {}
+        
+        # 初始化万、条、筒 1-9 各4张
+        for tile_type in [TileType.WAN, TileType.TIAO, TileType.TONG]:
+            for value in range(1, 10):
+                remaining_counts[f"{tile_type}-{value}"] = 4
+        
+        # 收集所有已使用的可见牌
+        used_tiles = []
+        
+        # 收集玩家的手牌和碰杠牌
+        for player_id, hand in self.player_hands.items():
+            # 只收集"我"的手牌
+            if player_id == "0":
+                used_tiles.extend(hand.tiles)
+            
+            # 收集所有玩家的碰杠牌（除了暗杠）
+            for meld in hand.melds:
+                if meld.type == MeldType.GANG and meld.gang_type == GangType.AN_GANG:
+                    if player_id == "0":  # 只收集"我"的暗杠
+                        used_tiles.extend(meld.tiles)
+                else:  # 收集所有明牌
+                    used_tiles.extend(meld.tiles)
+        
+        # 收集弃牌
+        used_tiles.extend(self.discarded_tiles)
+        
+        # 更新剩余数量
+        for tile in used_tiles:
+            key = f"{tile.type}-{tile.value}"
+            if key in remaining_counts:
+                remaining_counts[key] = max(0, remaining_counts[key] - 1)
+        
+        return remaining_counts
 
 
 class AnalysisResult(BaseModel):
@@ -144,3 +216,31 @@ class GameResponse(BaseModel):
     success: bool
     analysis: Optional[AnalysisResult] = None
     message: str = "" 
+
+
+# 操作相关模型
+class TileOperationRequest(BaseModel):
+    """牌操作请求"""
+    player_id: int = Field(..., ge=0, le=3)
+    operation_type: str  # discard, peng, gang, hand
+    tile: Tile
+    source_player_id: Optional[int] = None
+    game_id: Optional[str] = None  # 添加游戏ID字段
+
+
+class GameOperationResponse(BaseModel):
+    """游戏操作响应"""
+    success: bool
+    message: str
+    game_state: Optional[Dict] = None
+
+
+class GameStateRequest(BaseModel):
+    """游戏状态请求"""
+    game_state: GameState
+
+
+class ResetGameResponse(BaseModel):
+    """重置游戏响应"""
+    success: bool
+    message: str

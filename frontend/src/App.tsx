@@ -65,19 +65,6 @@ function App() {
                 <span>在线服务</span>
               </div>
               
-              {/* 当前使用的背面样式指示器 */}
-              <div className="hidden sm:flex items-center gap-2 text-xs text-gray-500">
-                <span>背面样式:</span>
-                <span className="px-2 py-1 bg-gray-100 rounded text-gray-700">
-                  {settings.cardBackStyle === 'elegant' ? '素雅白玉' :
-                   settings.cardBackStyle === 'classic' ? '经典绿色' :
-                   settings.cardBackStyle === 'bamboo' ? '竹韵青风' :
-                   settings.cardBackStyle === 'cloud' ? '云纹素白' :
-                   settings.cardBackStyle === 'traditional' ? '传统红木' :
-                   settings.cardBackStyle === 'pure' ? '极简纯色' : '未知'}
-                </span>
-              </div>
-              
               <button 
                 onClick={() => setShowSettings(true)}
                 className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"

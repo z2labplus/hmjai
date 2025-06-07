@@ -100,19 +100,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
           </div>
         )
       }
-    },
-    {
-      id: 'pure',
-      name: '极简纯色',
-      description: '完全纯色，无任何图案',
-      preview: {
-        background: 'bg-gray-200 border-gray-300',
-        pattern: (
-          <div className="flex flex-col items-center justify-center">
-            {/* 完全纯色，无任何图案 */}
-          </div>
-        )
-      }
     }
   ];
 
@@ -154,65 +141,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose }) => {
 
         {/* 内容 */}
         <div className="p-6">
-          {/* 麻将牌背面样式设置 */}
-          <div className="mb-8">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">麻将牌背面样式</h3>
-            <p className="text-sm text-gray-600 mb-6">选择您喜欢的麻将牌背面风格</p>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {cardBackOptions.map((option) => (
-                <motion.div
-                  key={option.id}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                    settings.cardBackStyle === option.id
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                  }`}
-                  onClick={() => handleBackStyleChange(option.id)}
-                >
-                  <div className="flex items-center space-x-4">
-                    {/* 预览卡片 */}
-                    <div className={`w-12 h-16 rounded-lg border-2 flex items-center justify-center ${option.preview.background}`}>
-                      {option.preview.pattern}
-                    </div>
-                    
-                    {/* 选项信息 */}
-                    <div className="flex-1">
-                      <h4 className="font-medium text-gray-900">{option.name}</h4>
-                      <p className="text-sm text-gray-600">{option.description}</p>
-                    </div>
-                    
-                    {/* 选中标识 */}
-                    {settings.cardBackStyle === option.id && (
-                      <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
-                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-
-            {/* 预览区域 */}
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">预览效果</h4>
-              <div className="flex items-center justify-center space-x-2">
-                <MahjongTile tile={sampleTile} variant="default" size="medium" />
-                <div className="text-gray-400">→</div>
-                <MahjongTile 
-                  tile={sampleTile} 
-                  variant="back" 
-                  size="medium" 
-                  cardBackStyle={settings.cardBackStyle}
-                />
-              </div>
-            </div>
-          </div>
-
           {/* 其他设置选项 */}
           <div className="border-t border-gray-200 pt-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">其他设置</h3>

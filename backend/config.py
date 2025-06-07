@@ -12,6 +12,8 @@ class Settings:
     REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
     REDIS_DB: int = int(os.getenv("REDIS_DB", "0"))
     REDIS_PASSWORD: str = os.getenv("REDIS_PASSWORD", "")
+    REDIS_RETRY_COUNT: int = int(os.getenv("REDIS_RETRY_COUNT", "3"))
+    REDIS_RETRY_DELAY: int = int(os.getenv("REDIS_RETRY_DELAY", "1"))  # 秒
     
     # API 配置
     API_HOST: str = os.getenv("API_HOST", "0.0.0.0")

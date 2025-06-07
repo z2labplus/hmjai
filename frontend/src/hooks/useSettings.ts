@@ -8,7 +8,7 @@ interface Settings {
 }
 
 const defaultSettings: Settings = {
-  cardBackStyle: 'pure',
+  cardBackStyle: 'elegant',
   enableAnimations: true,
   autoSave: true,
 };
@@ -24,6 +24,10 @@ export const useSettings = () => {
       const savedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
       if (savedSettings) {
         const parsed = JSON.parse(savedSettings);
+        // 如果之前保存的是pure，自动替换为elegant
+        if (parsed.cardBackStyle === 'pure') {
+          parsed.cardBackStyle = 'elegant';
+        }
         setSettings({ ...defaultSettings, ...parsed });
       }
     } catch (error) {

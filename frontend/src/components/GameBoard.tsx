@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useGameStore, selectMyHand, selectDiscardedTiles } from '../stores/gameStore';
 import { Tile, TileType, createTile, tileToString, tilesEqual, Meld, MeldType, GangType, calculateRemainingTilesByType } from '../types/mahjong';
 import MahjongTile from './MahjongTile';
 import MahjongTable from './MahjongTable';
 import { CardBackStyle } from './MahjongTile';
+import MahjongApiClient from '../services/MahjongApiClient';
 
 interface GameBoardProps {
   className?: string;
@@ -15,15 +16,65 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
   const myHand = useGameStore(selectMyHand());
   const discardedTiles = useGameStore(selectDiscardedTiles());
   const gameState = useGameStore(state => state.gameState);
-  const { addTileToHand, removeTileFromHand, addDiscardedTile, addMeld } = useGameStore();
+  const { 
+    addTileToHand, 
+    removeTileFromHand, 
+    addDiscardedTile, 
+    addMeld, 
+    reduceHandTilesCount,
+    syncFromBackend,
+    syncToBackend,
+    isApiConnected,
+    lastSyncTime
+  } = useGameStore();
   
   const [selectedTiles, setSelectedTiles] = useState<Tile[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState<number>(0); // 默认选择上家（显示索引0）
   const [operationType, setOperationType] = useState<'hand' | 'discard' | 'peng' | 'angang' | 'zhigang' | 'jiagang'>('hand');
   const [selectedSourcePlayer, setSelectedSourcePlayer] = useState<number | null>(null); // 新增：被杠玩家选择
+  const [autoSync, setAutoSync] = useState(false);
+  const autoSyncTimer = useRef<NodeJS.Timeout | null>(null);
   
   // 计算每种牌的剩余数量
   const remainingTilesByType = calculateRemainingTilesByType(gameState);
+  
+  // 调试信息：打印游戏状态和计算结果
+  React.useEffect(() => {
+    console.log('🎮 当前游戏状态:', gameState);
+    console.log('📊 剩余牌数统计:', remainingTilesByType);
+    
+    // 打印每个玩家的详细信息
+    Object.entries(gameState.player_hands).forEach(([playerId, hand]) => {
+      console.log(`玩家${playerId}:`, {
+        手牌数量: hand.tiles.length,
+        碰杠数量: hand.melds.length,
+        碰杠详情: hand.melds.map(meld => ({
+          类型: meld.type,
+          牌: meld.tiles.map(t => `${t.value}${t.type}`),
+          数量: meld.tiles.length
+        }))
+      });
+    });
+  }, [gameState, remainingTilesByType]);
+  
+  // 自动同步副作用
+  useEffect(() => {
+    if (autoSync) {
+      autoSyncTimer.current = setInterval(() => {
+        syncFromBackend();
+      }, 500);
+    } else if (autoSyncTimer.current) {
+      clearInterval(autoSyncTimer.current);
+      autoSyncTimer.current = null;
+    }
+    // 清理定时器
+    return () => {
+      if (autoSyncTimer.current) {
+        clearInterval(autoSyncTimer.current);
+        autoSyncTimer.current = null;
+      }
+    };
+  }, [autoSync, syncFromBackend]);
   
   // 所有可选的牌
   const availableTiles: Tile[] = [];
@@ -43,22 +94,44 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
     availableTiles.push(createTile(TileType.TONG, i));
   }
 
-  const handleTileClick = (tile: Tile) => {
+  const handleTileClick = async (tile: Tile) => {
     const actualPlayerId = displayOrder[selectedPlayer]; // 转换显示索引为实际Player ID
     
+    try {
     if (operationType === 'hand') {
       // 为当前选中的玩家添加手牌
-      addTileToHand(actualPlayerId, tile);
+        await MahjongApiClient.addTileToHand(actualPlayerId, tile);
     } else if (operationType === 'discard') {
+        // 调用API添加弃牌
+        const response = await MahjongApiClient.discardTile(actualPlayerId, tile.type, tile.value);
+        if (response.success) {
+          // API调用成功后，更新前端状态
       addDiscardedTile(tile, actualPlayerId);
+          // 获取最新的游戏状态
+          const gameState = await MahjongApiClient.getGameState();
+          if (gameState.success) {
+            useGameStore.setState({ gameState: gameState.data });
+          }
+        }
     } else if (operationType === 'peng') {
       // 碰牌：创建碰牌组并添加到melds
       const meld: Meld = {
         type: MeldType.PENG,
         tiles: [tile, tile, tile],
-        exposed: true
+        exposed: true,
+        source_player: selectedSourcePlayer !== null ? displayOrder[selectedSourcePlayer] : undefined
       };
       addMeld(actualPlayerId, meld);
+      
+      // 碰牌后自动减少手牌
+      if (actualPlayerId === 0) {
+        // "我" 碰牌：减少2张手牌（第3张是从别人那里碰来的，我知道自己的手牌）
+        removeTileFromHand(actualPlayerId, tile);
+        removeTileFromHand(actualPlayerId, tile);
+      } else {
+        // 其他玩家碰牌：直接减少3张手牌（模拟真实场景）
+        reduceHandTilesCount(actualPlayerId, 3, tile);
+      }       
     } else if (operationType === 'angang') {
       // 暗杠：创建暗杠组并添加到melds
       const meld: Meld = {
@@ -68,6 +141,18 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
         gang_type: GangType.AN_GANG
       };
       addMeld(actualPlayerId, meld);
+      
+      // 暗杠后自动减少手牌
+      if (actualPlayerId === 0) {
+        // "我" 暗杠：减少4张手牌（我知道自己的手牌）
+        removeTileFromHand(actualPlayerId, tile);
+        removeTileFromHand(actualPlayerId, tile);
+        removeTileFromHand(actualPlayerId, tile);
+        removeTileFromHand(actualPlayerId, tile);
+      } else {
+        // 其他玩家暗杠：直接减少4张手牌（模拟真实场景）
+        reduceHandTilesCount(actualPlayerId, 4, tile);
+      }
     } else if (operationType === 'zhigang') {
       // 直杠：创建明杠组并添加到melds
       const meld: Meld = {
@@ -78,6 +163,17 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
         source_player: selectedSourcePlayer !== null ? displayOrder[selectedSourcePlayer] : undefined
       };
       addMeld(actualPlayerId, meld);
+      
+      // 直杠后自动减少手牌
+      if (actualPlayerId === 0) {
+        // "我" 直杠：减少3张手牌（第4张是从别人那里杠来的，我知道自己的手牌）
+        removeTileFromHand(actualPlayerId, tile);
+        removeTileFromHand(actualPlayerId, tile);
+        removeTileFromHand(actualPlayerId, tile);
+      } else {
+        // 其他玩家直杠：直接减少4张手牌（模拟真实场景）
+        reduceHandTilesCount(actualPlayerId, 4, tile);
+      }
     } else if (operationType === 'jiagang') {
       // 加杠：创建明杠组并添加到melds
       const meld: Meld = {
@@ -87,6 +183,19 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
         gang_type: GangType.JIA_GANG  // 使用JIA_GANG类型
       };
       addMeld(actualPlayerId, meld);
+      
+      // 加杠后自动减少手牌
+      if (actualPlayerId === 0) {
+        // "我" 加杠：减少1张手牌（在已有碰牌基础上加杠，我知道自己的手牌）
+        removeTileFromHand(actualPlayerId, tile);
+      } else {
+        // 其他玩家加杠：直接减少1张手牌（模拟真实场景）
+        reduceHandTilesCount(actualPlayerId, 1, tile);
+      }
+      }
+    } catch (error) {
+      console.error('操作失败:', error);
+      // 可以在这里添加错误提示
     }
   };
   
@@ -116,8 +225,8 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
   // 处理操作类型改变
   const handleOperationTypeChange = (newOperationType: 'hand' | 'discard' | 'peng' | 'angang' | 'zhigang' | 'jiagang') => {
     setOperationType(newOperationType);
-    // 如果不是直杠操作，清除被杠玩家的选择
-    if (newOperationType !== 'zhigang') {
+    // 如果不是直杠或碰牌操作，清除被杠/被碰玩家的选择
+    if (newOperationType !== 'zhigang' && newOperationType !== 'peng') {
       setSelectedSourcePlayer(null);
     }
   };
@@ -162,6 +271,8 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
       <div className="bg-white rounded-lg p-3 border border-gray-300 mb-3">
         <MahjongTable cardBackStyle={cardBackStyle} />
       </div>
+      
+
       
       {/* 操作控制区域 */}
       <div className="mb-3 flex-shrink-0">
@@ -261,11 +372,11 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
             </div>
           </div>
 
-          {/* 2.1 选择被杠玩家 - 只有选择直杠时显示 */}
-          {operationType === 'zhigang' && (
+          {/* 2.1 选择被杠玩家/被碰玩家 - 只有选择直杠或碰牌时显示 */}
+          {(operationType === 'zhigang' || operationType === 'peng') && (
             <div className="flex items-center gap-3 pl-6 border-l-2 border-blue-200">
               <span className="text-sm font-medium text-gray-700 min-w-max">
-                2.1 选择被杠玩家:
+                2.1 选择被{operationType === 'zhigang' ? '杠' : '碰'}玩家:
               </span>
               <div className="flex gap-1">
                 {getAvailableSourcePlayers().map(({ name, index }) => (
@@ -299,7 +410,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
             <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
             <span className="text-sm text-blue-700">
               当前操作: 为 <span className="font-medium">{displayNames[selectedPlayer]}</span> {getOperationName(operationType)}
-              {operationType === 'zhigang' && selectedSourcePlayer !== null && (
+              {(operationType === 'zhigang' || operationType === 'peng') && selectedSourcePlayer !== null && (
                 <span> (从 <span className="font-medium">{displayNames[selectedSourcePlayer]}</span>)</span>
               )}
             </span>
@@ -330,6 +441,51 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
                   />
                 );
               })}
+          </div>
+        </div>
+      </div>
+
+            {/* API同步控制区域 */}
+            <div className="mb-3 flex-shrink-0">
+        <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <h3 className="text-sm font-semibold text-gray-700">API同步状态</h3>
+              <div className={`flex items-center gap-2 px-2 py-1 rounded-full text-xs ${
+                isApiConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+              }`}>
+                <div className={`w-2 h-2 rounded-full ${
+                  isApiConnected ? 'bg-green-500' : 'bg-red-500'
+                }`}></div>
+                {isApiConnected ? '已连接' : '未连接'}
+              </div>
+              {lastSyncTime && (
+                <span className="text-xs text-gray-500">
+                  最后同步: {lastSyncTime.toLocaleTimeString()}
+                </span>
+              )}
+            </div>
+            
+            <div className="flex gap-2">
+              <button
+                onClick={syncFromBackend}
+                className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
+              >
+                ⬇️ 从后端同步
+              </button>
+              <button
+                onClick={syncToBackend}
+                className="px-3 py-1.5 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors"
+              >
+                ⬆️ 同步到后端
+              </button>
+              <button
+                onClick={() => setAutoSync(prev => !prev)}
+                className={`px-3 py-1.5 text-xs font-medium ${autoSync ? 'text-red-600 bg-red-50 border-red-200 hover:bg-red-100' : 'text-purple-600 bg-purple-50 border-purple-200 hover:bg-purple-100'} rounded-md border transition-colors`}
+              >
+                {autoSync ? '停止自动同步' : '自动同步后端'}
+              </button>
+            </div>
           </div>
         </div>
       </div>

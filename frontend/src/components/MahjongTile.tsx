@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import classNames from 'classnames';
 import { Tile, tileToString, TileType } from '../types/mahjong';
 
-export type CardBackStyle = 'classic' | 'elegant' | 'bamboo' | 'cloud' | 'traditional' | 'pure';
+export type CardBackStyle = 'classic' | 'elegant' | 'bamboo' | 'cloud' | 'traditional';
 
 interface MahjongTileProps {
   tile: Tile;
@@ -51,8 +51,7 @@ const MahjongTile: React.FC<MahjongTileProps> = ({
       elegant: 'bg-gradient-to-br from-gray-100 to-gray-200 border-gray-300',
       bamboo: 'bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200',
       cloud: 'bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200',
-      traditional: 'bg-gradient-to-br from-red-900 to-red-950 border-red-800',
-      pure: 'bg-gray-200 border-gray-300'
+      traditional: 'bg-gradient-to-br from-red-900 to-red-950 border-red-800'
     };
     return backStyles[style] + ' cursor-not-allowed';
   };
@@ -127,12 +126,6 @@ const MahjongTile: React.FC<MahjongTileProps> = ({
             <div className="text-xs opacity-80">麻</div>
             <div className="w-3 h-0.5 bg-yellow-200/40 my-0.5"></div>
             <div className="text-xs opacity-80">将</div>
-          </div>
-        );
-      case 'pure':
-        return (
-          <div className="relative z-10 flex flex-col items-center justify-center">
-            {/* 完全纯色，无任何图案 */}
           </div>
         );
       default:
