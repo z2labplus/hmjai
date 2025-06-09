@@ -51,6 +51,7 @@ interface GameStore {
   syncFromBackend: () => Promise<void>;
   syncToBackend: () => Promise<void>;
   setApiConnectionStatus: (connected: boolean) => void;
+  checkApiConnection: () => Promise<boolean>;
   
   // 重置功能
   resetGame: () => void;
@@ -59,12 +60,12 @@ interface GameStore {
 
 // 初始游戏状态
 const initialGameState: GameState = {
-  game_id: '',
+  game_id: 'default_game',
   player_hands: {
-    '0': { tiles: [], melds: [] },
-    '1': { tiles: [], melds: [] },
-    '2': { tiles: [], melds: [] },
-    '3': { tiles: [], melds: [] }
+    '0': { tiles: [], tile_count: 0, melds: [] },      // 我的手牌：具体牌面
+    '1': { tiles: null, tile_count: 0, melds: [] },    // 其他玩家：只有数量
+    '2': { tiles: null, tile_count: 0, melds: [] },    // 其他玩家：只有数量
+    '3': { tiles: null, tile_count: 0, melds: [] }     // 其他玩家：只有数量
   },
   current_player: 0,
   discarded_tiles: [],
@@ -108,7 +109,20 @@ export const useGameStore = create<GameStore>()(
     addTileToHand: (playerId, tile) => set((state) => {
       const newGameState = { ...state.gameState };
       const playerHand = { ...newGameState.player_hands[playerId] };
-      playerHand.tiles = [...playerHand.tiles, tile];
+      
+      if (playerId === 0) {
+        // 玩家0：添加具体牌面
+        if (!playerHand.tiles) {
+          playerHand.tiles = [];
+        }
+        playerHand.tiles = [...playerHand.tiles, tile];
+        playerHand.tile_count = playerHand.tiles.length;
+      } else {
+        // 其他玩家：只增加数量，tiles保持null
+        playerHand.tile_count = (playerHand.tile_count || 0) + 1;
+        playerHand.tiles = null;
+      }
+      
       newGameState.player_hands[playerId] = playerHand;
       
       return { gameState: newGameState };
@@ -117,6 +131,12 @@ export const useGameStore = create<GameStore>()(
     removeTileFromHand: (playerId, tileToRemove) => set((state) => {
       const newGameState = { ...state.gameState };
       const playerHand = { ...newGameState.player_hands[playerId] };
+      
+      // 安全处理tiles可能为null的情况
+      if (!playerHand.tiles) {
+        console.warn(`玩家${playerId}的手牌为null，无法移除牌`);
+        return state;
+      }
       
       // 找到第一个匹配的牌并移除
       const tileIndex = playerHand.tiles.findIndex(tile => 
@@ -128,6 +148,8 @@ export const useGameStore = create<GameStore>()(
           ...playerHand.tiles.slice(0, tileIndex),
           ...playerHand.tiles.slice(tileIndex + 1)
         ];
+        // 更新tile_count
+        playerHand.tile_count = playerHand.tiles.length;
         newGameState.player_hands[playerId] = playerHand;
       }
       
@@ -137,6 +159,15 @@ export const useGameStore = create<GameStore>()(
     reduceHandTilesCount: (playerId, count, preferredTile) => set((state) => {
       const newGameState = { ...state.gameState };
       const playerHand = { ...newGameState.player_hands[playerId] };
+      
+      if (!playerHand.tiles) {
+        // 对于其他玩家，只减少tile_count
+        const currentCount = playerHand.tile_count || 0;
+        playerHand.tile_count = Math.max(0, currentCount - count);
+        newGameState.player_hands[playerId] = playerHand;
+        return { gameState: newGameState };
+      }
+      
       let tiles = [...playerHand.tiles];
       
       // 确保手牌足够
@@ -163,6 +194,7 @@ export const useGameStore = create<GameStore>()(
       }
       
       playerHand.tiles = tiles;
+      playerHand.tile_count = tiles.length;
       newGameState.player_hands[playerId] = playerHand;
       
       return { gameState: newGameState };
@@ -230,6 +262,12 @@ export const useGameStore = create<GameStore>()(
     // API同步功能实现
     syncFromBackend: async () => {
       try {
+        // 先检查健康状态
+        const isHealthy = await MahjongApiClient.checkHealth();
+        if (!isHealthy) {
+          throw new Error('后端服务不可用');
+        }
+        
         const backendState = await MahjongApiClient.getGameState();
         set({
           gameState: backendState,
@@ -240,11 +278,18 @@ export const useGameStore = create<GameStore>()(
       } catch (error) {
         console.error('❌ 从后端同步状态失败:', error);
         set({ isApiConnected: false });
+        throw error; // 重新抛出错误以便UI处理
       }
     },
     
     syncToBackend: async () => {
       try {
+        // 先检查健康状态
+        const isHealthy = await MahjongApiClient.checkHealth();
+        if (!isHealthy) {
+          throw new Error('后端服务不可用');
+        }
+        
         const currentState = get().gameState;
         await MahjongApiClient.setGameState(currentState);
         set({
@@ -255,11 +300,25 @@ export const useGameStore = create<GameStore>()(
       } catch (error) {
         console.error('❌ 同步状态到后端失败:', error);
         set({ isApiConnected: false });
+        throw error; // 重新抛出错误以便UI处理
       }
     },
     
     setApiConnectionStatus: (connected: boolean) => {
       set({ isApiConnected: connected });
+    },
+    
+    // 检查API连接状态
+    checkApiConnection: async () => {
+      try {
+        const isHealthy = await MahjongApiClient.checkHealth();
+        set({ isApiConnected: isHealthy });
+        return isHealthy;
+      } catch (error) {
+        console.error('❌ API连接检查失败:', error);
+        set({ isApiConnected: false });
+        return false;
+      }
     }
   }))
 );

@@ -23,7 +23,15 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
   // 获取玩家手牌，如果不存在则返回空数组
   const getPlayerHand = (playerId: number) => {
     const playerIdStr = playerId.toString();
-    return gameState.player_hands[playerIdStr] || { tiles: [], melds: [] };
+    const hand = gameState.player_hands[playerIdStr];
+    if (!hand) {
+      return { tiles: [], tile_count: 0, melds: [] };
+    }
+    return {
+      tiles: hand.tiles || [],
+      tile_count: hand.tile_count || (hand.tiles?.length || 0),
+      melds: hand.melds || []
+    };
   };
   
   const player0Hand = getPlayerHand(0);
@@ -84,7 +92,7 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
   // 未出牌数：等于选择区域中显示的所有牌的右上角数字之和
   const unplayedTiles = calculateUnplayedTiles();
   
-  const playerNames = ['我', '下家', '对家', '上家'];
+  const playerNames = ['0我', '1下家', '2对家', '3上家'];
   const playerColors = ['bg-blue-50 border-blue-200', 'bg-green-50 border-green-200', 'bg-red-50 border-red-200', 'bg-yellow-50 border-yellow-200'];
   
   // 展示顺序：上家、我、下家、对家
@@ -213,7 +221,7 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
           <div className="flex items-center gap-2">
             <h3 className="text-lg font-bold text-gray-800">{playerNames[playerId]}</h3>
             <div className="text-sm text-gray-600">
-              (手牌: {hand.tiles.length} | 碰杠: {calculateMeldTilesCount(hand.melds)} | 弃牌: {discards.length})
+              (手牌: {hand.tile_count || (hand.tiles?.length || 0)} | 碰杠: {calculateMeldTilesCount(hand.melds)} | 弃牌: {discards.length})
             </div>
           </div>
         </div>
@@ -224,48 +232,75 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
           <div className="mb-1">
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: '20px'}}>
               {/* 手牌区域 */}
-              {hand.tiles.length > 0 && (
-                <div style={{ display: 'flex' }}>
-                  {hand.tiles.map((tile: Tile, index: number) => {
-                    const isDragging = draggedIndex === index && playerId === 0;
-                    const isDragOver = dragOverIndex === index && playerId === 0;
-                    
-                    return (
-                      <div
-                        key={`player-${playerId}-hand-${index}`}
-                        draggable={playerId === 0} // 只有"我"的手牌可以拖拽
-                        onDragStart={(e) => handleDragStart(e, index, playerId)}
-                        onDragOver={(e) => handleDragOver(e, index, playerId)}
-                        onDragEnter={(e) => handleDragEnter(e, index, playerId)}
-                        onDragLeave={handleDragLeave}
-                        onDrop={(e) => handleDrop(e, index, playerId)}
-                        onDragEnd={handleDragEnd}
-                        onDoubleClick={() => handleTileDoubleClick(tile, index, playerId)} // 添加双击事件
-                        className={`transition-all duration-200 ${
-                          playerId === 0 ? 'cursor-grab active:cursor-grabbing hover:cursor-pointer' : ''
-                        } ${
-                          isDragging ? 'opacity-50 scale-105' : ''
-                        } ${
-                          isDragOver ? 'transform scale-110' : ''
-                        }`}
-                        style={{
-                          transform: isDragOver ? 'translateY(-4px)' : 'none',
-                          filter: isDragging ? 'brightness(1.1)' : 'none'
-                        }}
-                        title={playerId === 0 ? "拖拽重排 | 双击弃牌" : ""} // 添加提示文字
-                      >
-                        <MahjongTile
-                          tile={tile}
-                          size="small"
-                          variant={playerId === 0 ? "default" : "back"}
-                          seamless={true}
-                          cardBackStyle={cardBackStyle}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              {(() => {
+                const handTileCount = hand.tile_count || (hand.tiles?.length || 0);
+                
+                if (handTileCount > 0) {
+                  return (
+                    <div style={{ display: 'flex' }}>
+                      {/* 玩家0（我）：显示具体牌面 */}
+                      {playerId === 0 && hand.tiles ? (
+                        hand.tiles.map((tile: Tile, index: number) => {
+                          const isDragging = draggedIndex === index && playerId === 0;
+                          const isDragOver = dragOverIndex === index && playerId === 0;
+                          
+                          return (
+                            <div
+                              key={`player-${playerId}-hand-${index}`}
+                              draggable={playerId === 0} // 只有"我"的手牌可以拖拽
+                              onDragStart={(e) => handleDragStart(e, index, playerId)}
+                              onDragOver={(e) => handleDragOver(e, index, playerId)}
+                              onDragEnter={(e) => handleDragEnter(e, index, playerId)}
+                              onDragLeave={handleDragLeave}
+                              onDrop={(e) => handleDrop(e, index, playerId)}
+                              onDragEnd={handleDragEnd}
+                              onDoubleClick={() => handleTileDoubleClick(tile, index, playerId)} // 添加双击事件
+                              className={`transition-all duration-200 ${
+                                'cursor-grab active:cursor-grabbing hover:cursor-pointer'
+                              } ${
+                                isDragging ? 'opacity-50 scale-105' : ''
+                              } ${
+                                isDragOver ? 'transform scale-110' : ''
+                              }`}
+                              style={{
+                                transform: isDragOver ? 'translateY(-4px)' : 'none',
+                                filter: isDragging ? 'brightness(1.1)' : 'none'
+                              }}
+                              title="拖拽重排 | 双击弃牌" // 添加提示文字
+                            >
+                              <MahjongTile
+                                tile={tile}
+                                size="small"
+                                variant="default"
+                                seamless={true}
+                                cardBackStyle={cardBackStyle}
+                              />
+                            </div>
+                          );
+                        })
+                      ) : (
+                        /* 其他玩家：显示对应数量的背面牌 */
+                        Array.from({ length: handTileCount }, (_, index) => (
+                          <div
+                            key={`player-${playerId}-back-${index}`}
+                            className="transition-all duration-200"
+                            title={`玩家${playerNames[playerId]}的手牌`}
+                          >
+                            <MahjongTile
+                              tile={{ type: 'wan' as any, value: 1 }} // 虚拟牌，不会显示具体内容
+                              size="small"
+                              variant="back"
+                              seamless={true}
+                              cardBackStyle={cardBackStyle}
+                            />
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  );
+                }
+                return null;
+              })()}
               
               {/* 碰牌杠牌区域 - 组间有小间隙(gap-2) */}
               {hand.melds.length > 0 && (

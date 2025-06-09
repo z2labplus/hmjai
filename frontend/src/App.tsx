@@ -9,7 +9,7 @@ import { MahjongAPI } from './utils/api';
 import './App.css';
 
 function App() {
-  const { setAvailableTiles } = useGameStore();
+  const { setAvailableTiles, checkApiConnection } = useGameStore();
   const { settings } = useSettings();
   const [showSettings, setShowSettings] = useState(false);
 
@@ -17,21 +17,23 @@ function App() {
     // 初始化时获取麻将牌信息
     const initializeApp = async () => {
       try {
-        const tiles = await MahjongAPI.getTileCodes();
-        setAvailableTiles(tiles);
+        // 检查API连接状态
+        const isConnected = await checkApiConnection();
+        console.log(`🔗 API连接状态: ${isConnected ? '已连接' : '未连接'}`);
         
-        // 健康检查
-        const isHealthy = await MahjongAPI.healthCheck();
-        if (!isHealthy) {
-          console.warn('后端服务可能未正常运行');
+        if (isConnected) {
+          const tiles = await MahjongAPI.getTileCodes();
+          setAvailableTiles(tiles);
+        } else {
+          console.warn('⚠️ 后端服务未连接，部分功能可能不可用');
         }
       } catch (error) {
-        console.error('初始化应用失败:', error);
+        console.error('❌ 初始化应用失败:', error);
       }
     };
 
     initializeApp();
-  }, [setAvailableTiles]);
+  }, [setAvailableTiles, checkApiConnection]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex flex-col">

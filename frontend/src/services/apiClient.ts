@@ -229,7 +229,7 @@ export class MahjongApiClient {
   // 检查服务器连接
   static async checkHealth(): Promise<boolean> {
     try {
-      const response = await axios.get('http://localhost:8000/health');
+      const response = await apiClient.get('/health');
       return response.status === 200;
     } catch (error) {
       return false;

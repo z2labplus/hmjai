@@ -35,7 +35,8 @@ export interface Meld {
 }
 
 export interface HandTiles {
-  tiles: Tile[];
+  tiles: Tile[] | null;  // 其他玩家为null，只有我（玩家0）有具体牌面
+  tile_count: number;     // 手牌数量（必需字段）
   melds: Meld[];
 }
 
@@ -49,17 +50,14 @@ export interface PlayerAction {
 export interface GameState {
   game_id: string;
   player_hands: {
-    [key: string]: {
-      tiles: Tile[];
-      melds: Meld[];
-    }
+    [key: string]: HandTiles;
   };
   current_player: number;
   discarded_tiles: Tile[];
   player_discarded_tiles: {
     [key: string]: Tile[];
   };
-  actions_history: any[];
+  actions_history: PlayerAction[];
   game_started: boolean;
 }
 
@@ -153,16 +151,19 @@ export const tilesEqual = (tile1: Tile, tile2: Tile): boolean => {
   return tile1.type === tile2.type && tile1.value === tile2.value;
 };
 
-// 计算剩余牌数（原有逻辑：计算所有已使用的牌）
+// 计算剩余牌数（原有逻辑：基于tile_count计算所有已使用的牌）
 export const calculateRemainingTiles = (gameState: GameState): number => {
   const totalTiles = 108; // 标准麻将总牌数
   
   // 计算已使用的牌数
   let usedTiles = 0;
   
-  // 计算所有玩家手牌数量（所有玩家的手牌都计算）
+  // 计算所有玩家手牌数量
   Object.values(gameState.player_hands).forEach(hand => {
-    usedTiles += hand.tiles.length;
+    // 使用tile_count字段，如果不存在则用tiles数组长度（向后兼容）
+    const handTileCount = hand.tile_count !== undefined ? hand.tile_count : (hand.tiles?.length || 0);
+    usedTiles += handTileCount;
+    
     // 计算碰牌杠牌数量（所有碰杠都计算）
     hand.melds.forEach(meld => {
       usedTiles += meld.tiles.length;
@@ -188,7 +189,8 @@ export const calculateVisibleRemainingTiles = (gameState: GameState): number => 
     
     // 只计算"我"（playerId=0）的手牌，其他玩家的手牌不可见
     if (playerId === 0) {
-      usedTiles += hand.tiles.length;
+      const handTileCount = hand.tile_count !== undefined ? hand.tile_count : (hand.tiles?.length || 0);
+      usedTiles += handTileCount;
     }
     
     // 计算碰牌杠牌数量
@@ -242,15 +244,20 @@ export const calculateRemainingTilesByType = (gameState: GameState): { [key: str
   Object.entries(gameState.player_hands).forEach(([playerIdStr, hand]) => {
     const playerId = parseInt(playerIdStr);
     
+    // 获取手牌数量，安全处理null的情况
+    const handTileCount = hand.tile_count !== undefined ? hand.tile_count : (hand.tiles?.length || 0);
+    const handTiles = hand.tiles || [];
+    
     console.log(`🏠 处理玩家${playerId}:`, {
-      手牌数量: hand.tiles.length,
-      碰杠数量: hand.melds.length
+      手牌数量: handTileCount,
+      碰杠数量: hand.melds.length,
+      具体手牌: playerId === 0 ? handTiles.map(t => `${t.value}${t.type}`) : '(隐藏)'
     });
     
     // 只收集"我"（playerId=0）的手牌，其他玩家的手牌不可见
-    if (playerId === 0) {
-      console.log('👤 收集我的手牌:', hand.tiles.map(t => `${t.value}${t.type}`));
-      usedTiles.push(...hand.tiles);
+    if (playerId === 0 && handTiles.length > 0) {
+      console.log('👤 收集我的手牌:', handTiles.map(t => `${t.value}${t.type}`));
+      usedTiles.push(...handTiles);
     }
     
     // 收集碰牌杠牌

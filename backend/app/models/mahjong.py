@@ -78,7 +78,8 @@ class Meld(BaseModel):
 
 class HandTiles(BaseModel):
     """玩家手牌"""
-    tiles: List[Tile] = []
+    tiles: Optional[List[Tile]] = None  # 允许为None（其他玩家的手牌）
+    tile_count: Optional[int] = 0  # 手牌数量（用于其他玩家）
     melds: List[Meld] = []
 
 
@@ -101,6 +102,10 @@ class GameState(BaseModel):
     game_started: bool = False
     last_action: Optional[Dict[str, Any]] = None
     
+    class Config:
+        # 允许额外字段，保持向后兼容
+        extra = "allow"
+    
     def get_visible_tiles(self) -> List[Tile]:
         """获取所有可见的牌"""
         visible = []
@@ -120,7 +125,12 @@ class GameState(BaseModel):
         
         # 计算所有玩家手牌数量
         for hand in self.player_hands.values():
-            used_tiles += len(hand.tiles)
+            # 使用tile_count字段，如果不存在则使用tiles长度
+            if hand.tile_count is not None:
+                used_tiles += hand.tile_count
+            elif hand.tiles is not None:
+                used_tiles += len(hand.tiles)
+            
             # 计算碰牌杠牌数量
             for meld in hand.melds:
                 used_tiles += len(meld.tiles)
@@ -139,7 +149,10 @@ class GameState(BaseModel):
         for player_id, hand in self.player_hands.items():
             # 只计算"我"（player_id=0）的手牌
             if player_id == "0":
-                used_tiles += len(hand.tiles)
+                if hand.tile_count is not None:
+                    used_tiles += hand.tile_count
+                elif hand.tiles is not None:
+                    used_tiles += len(hand.tiles)
             
             # 计算碰牌杠牌数量
             for meld in hand.melds:
@@ -172,7 +185,7 @@ class GameState(BaseModel):
         # 收集玩家的手牌和碰杠牌
         for player_id, hand in self.player_hands.items():
             # 只收集"我"的手牌
-            if player_id == "0":
+            if player_id == "0" and hand.tiles is not None:
                 used_tiles.extend(hand.tiles)
             
             # 收集所有玩家的碰杠牌（除了暗杠）

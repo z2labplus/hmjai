@@ -152,18 +152,7 @@ async def reset_game():
         raise HTTPException(status_code=500, detail=f"重置游戏失败: {str(e)}")
 
 
-@router.get("/game-state")
-async def get_game_state():
-    """获取当前游戏状态"""
-    try:
-        game_state = game_service.get_game_state()
-        return {
-            "success": True,
-            "message": "获取游戏状态成功",
-            "data": game_state
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取游戏状态失败: {str(e)}")
+# 已移除重复的 /game-state 路由，使用上面的 get_current_game_state 函数
 
 
 @router.post("/discard-tile")
@@ -221,7 +210,12 @@ async def add_hand_tile(
     tile_value: int,
     game_id: Optional[str] = None
 ):
-    """为玩家添加手牌"""
+    """为玩家添加手牌
+    
+    注意：
+    - 玩家0（我）：添加具体牌面
+    - 其他玩家：只增加手牌数量
+    """
     try:
         tile = Tile(type=TileType(tile_type), value=tile_value)
         request = TileOperationRequest(
@@ -236,13 +230,61 @@ async def add_hand_tile(
         return {
             "success": success,
             "message": message,
-            "tile": tile.dict(),
+            "tile": tile.dict() if player_id == 0 else None,  # 其他玩家不返回具体牌面
             "player_id": player_id,
             "game_id": game_id
         }
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"添加手牌失败: {str(e)}")
+
+
+@router.post("/add-hand-count")
+async def add_hand_count(
+    player_id: int,
+    count: int = 1
+):
+    """为其他玩家增加手牌数量（不指定具体牌面）
+    
+    注意：
+    - 只能用于其他玩家（1、2、3）
+    - 玩家0（我）请使用 add-hand-tile 接口
+    """
+    try:
+        if player_id == 0:
+            raise ValueError("玩家0（我）请使用 add-hand-tile 接口添加具体牌面")
+        
+        if count <= 0:
+            raise ValueError("数量必须大于0")
+        
+        # 获取当前游戏状态
+        current_state = game_service.get_game_state()
+        player_id_str = str(player_id)
+        
+        # 确保玩家存在
+        if player_id_str not in current_state["player_hands"]:
+            current_state["player_hands"][player_id_str] = {
+                "tiles": None,
+                "tile_count": 0,
+                "melds": []
+            }
+        
+        # 增加手牌数量
+        current_state["player_hands"][player_id_str]["tile_count"] += count
+        
+        # 保存状态
+        game_service.set_game_state_dict(current_state)
+        
+        return {
+            "success": True,
+            "message": f"玩家{player_id}手牌数量+{count}",
+            "player_id": player_id,
+            "added_count": count,
+            "total_count": current_state["player_hands"][player_id_str]["tile_count"]
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"增加手牌数量失败: {str(e)}")
 
 
 @router.post("/peng")

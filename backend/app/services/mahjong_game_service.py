@@ -15,7 +15,13 @@ from ..core.config import settings
 
 
 class MahjongGameService:
-    """麻将游戏服务，处理所有游戏操作"""
+    """麻将游戏服务 - 真实辅助工具版本
+    
+    设计原则：
+    - 玩家0（我）：完全已知的手牌和操作
+    - 其他玩家：只知道手牌数量和明牌操作
+    - 所有玩家的弃牌和明牌（碰、明杠、加杠）都是可见的
+    """
     
     def __init__(self):
         # 初始化Redis连接
@@ -57,7 +63,7 @@ class MahjongGameService:
         return self._game_state
     
     def set_game_state(self, game_state: GameState) -> bool:
-        """设置游戏状态"""
+        """设置游戏状态（从Pydantic模型）"""
         try:
             self._game_state = game_state.dict()
             self._save_state()
@@ -67,7 +73,7 @@ class MahjongGameService:
             return False
     
     def set_game_state_dict(self, game_state: Dict[str, Any]) -> bool:
-        """设置游戏状态（字典格式）"""
+        """设置游戏状态（从字典）"""
         try:
             self._game_state = game_state
             self._save_state()
@@ -82,20 +88,34 @@ class MahjongGameService:
         self._save_state()
     
     def add_tile_to_hand(self, player_id: int, tile: Tile) -> bool:
-        """为玩家添加手牌"""
+        """为玩家添加手牌
+        
+        注意：只有玩家0（我）可以添加具体牌面
+        其他玩家只增加手牌数量
+        """
         try:
             player_id_str = str(player_id)
             if player_id_str not in self._game_state["player_hands"]:
                 self._game_state["player_hands"][player_id_str] = {
-                    "tiles": [],
+                    "tiles": [] if player_id == 0 else None,  # 其他玩家不存储具体牌面
+                    "tile_count": 0,  # 新增：手牌数量
                     "melds": []
                 }
             
-            # 添加手牌
-            self._game_state["player_hands"][player_id_str]["tiles"].append({
-                "type": tile.type,
-                "value": tile.value
-            })
+            if player_id == 0:
+                # 我：添加具体手牌
+                self._game_state["player_hands"][player_id_str]["tiles"].append({
+                    "type": tile.type,
+                    "value": tile.value
+                })
+                self._game_state["player_hands"][player_id_str]["tile_count"] = len(
+                    self._game_state["player_hands"][player_id_str]["tiles"]
+                )
+                print(f"✅ 我（玩家0）添加手牌: {tile.value}{tile.type}")
+            else:
+                # 其他玩家：只增加数量
+                self._game_state["player_hands"][player_id_str]["tile_count"] += 1
+                print(f"✅ 玩家{player_id}手牌数量+1 (当前:{self._game_state['player_hands'][player_id_str]['tile_count']}张)")
             
             # 记录操作历史
             self._game_state["actions_history"].append({
@@ -104,248 +124,134 @@ class MahjongGameService:
                 "tile": {
                     "type": tile.type,
                     "value": tile.value
-                },
+                } if player_id == 0 else None,  # 其他玩家不记录具体牌面
                 "timestamp": datetime.now().timestamp()
             })
             
-            # 保存并广播状态
             self._save_state()
             return True
         except Exception as e:
             print(f"添加手牌失败: {e}")
             return False
     
-    async def _broadcast_state_update(self):
-        pass  # 已废弃，无需广播
-    
-    async def discard_tile(self, player_id: int, tile: Tile) -> bool:
-        """玩家弃牌（智能版本）"""
+    def discard_tile(self, player_id: int, tile: Tile) -> bool:
+        """玩家弃牌"""
         try:
+            player_id_str = str(player_id)
+            
             # 确保玩家有手牌数据结构
-            if player_id not in self._game_state["player_hands"]:
-                self._game_state["player_hands"][player_id] = HandTiles(tiles=[], melds=[])
+            if player_id_str not in self._game_state["player_hands"]:
+                self._game_state["player_hands"][player_id_str] = {
+                    "tiles": [] if player_id == 0 else None,
+                    "tile_count": 0,
+                    "melds": []
+                }
             
-            hand_tiles = self._game_state["player_hands"][player_id].tiles
+            if player_id == 0:
+                # 我：从具体手牌中移除
+                hand_tiles = self._game_state["player_hands"][player_id_str]["tiles"]
+                found_tile_index = None
+                for i, hand_tile in enumerate(hand_tiles):
+                    if hand_tile["type"] == tile.type and hand_tile["value"] == tile.value:
+                        found_tile_index = i
+                        break
+                
+                if found_tile_index is not None:
+                    hand_tiles.pop(found_tile_index)
+                    self._game_state["player_hands"][player_id_str]["tile_count"] = len(hand_tiles)
+                    print(f"✅ 我（玩家0）弃牌: {tile.value}{tile.type}")
+                else:
+                    print(f"⚠️ 我（玩家0）手牌中没有 {tile.value}{tile.type}")
+                    return False
+            else:
+                # 其他玩家：只减少数量
+                if self._game_state["player_hands"][player_id_str]["tile_count"] > 0:
+                    self._game_state["player_hands"][player_id_str]["tile_count"] -= 1
+                    print(f"✅ 玩家{player_id}弃牌，手牌数量-1 (当前:{self._game_state['player_hands'][player_id_str]['tile_count']}张)")
+                else:
+                    print(f"⚠️ 玩家{player_id}没有手牌可弃")
+                    return False
             
-            # 检查手牌中是否有要弃的牌
-            found_tile_index = None
-            for i, hand_tile in enumerate(hand_tiles):
-                if hand_tile.type == tile.type and hand_tile.value == tile.value:
-                    found_tile_index = i
-                    break
-            
-            # 如果手牌中没有要弃的牌，智能添加
-            if found_tile_index is None:
-                print(f"玩家 {player_id} 手牌中没有 {tile}，智能添加后再弃牌")
-                hand_tiles.append(tile)
-                found_tile_index = len(hand_tiles) - 1
-            
-            # 从手牌中移除
-            hand_tiles.pop(found_tile_index)
-            
-            # 添加到弃牌池
-            self._game_state["discarded_tiles"].append(tile)
+            # 添加到弃牌池（所有弃牌都是可见的）
+            self._game_state["discarded_tiles"].append(tile.dict())
             
             # 添加到玩家弃牌池
-            if player_id not in self._game_state["player_discarded_tiles"]:
-                self._game_state["player_discarded_tiles"][player_id] = []
-            self._game_state["player_discarded_tiles"][player_id].append(tile)
+            if player_id_str not in self._game_state["player_discarded_tiles"]:
+                self._game_state["player_discarded_tiles"][player_id_str] = []
+            self._game_state["player_discarded_tiles"][player_id_str].append(tile.dict())
             
             # 记录操作历史
-            action = PlayerAction(
-                player_id=player_id,
-                action_type="discard",
-                tiles=[tile]
-            )
-            self._game_state["actions_history"].append(action)
+            self._game_state["actions_history"].append({
+                "player_id": player_id,
+                "action_type": "discard",
+                "tile": tile.dict(),  # 弃牌对所有人可见
+                "timestamp": datetime.now().timestamp()
+            })
             
-            # 广播状态更新
             self._save_state()
             return True
         except Exception as e:
             print(f"弃牌失败: {e}")
             return False
     
-    async def peng_tile(self, player_id: int, tile: Tile, source_player_id: Optional[int] = None) -> bool:
-        """碰牌操作"""
-        try:
-            # 创建碰牌组
-            meld = Meld(
-                type=MeldType.PENG,
-                tiles=[tile, tile, tile],
-                exposed=True,
-                source_player=source_player_id
-            )
-            
-            # 添加到玩家的melds中
-            if player_id not in self._game_state["player_hands"]:
-                self._game_state["player_hands"][player_id] = HandTiles(tiles=[], melds=[])
-            
-            self._game_state["player_hands"][player_id].melds.append(meld)
-            
-            # 减少手牌
-            if player_id == 0:
-                # "我" 碰牌：减少2张手牌
-                self._reduce_hand_tiles(player_id, 2, tile)
-            else:
-                # 其他玩家碰牌：减少3张手牌
-                self._reduce_hand_tiles(player_id, 3, tile)
-            
-            # 记录操作历史
-            action = PlayerAction(
-                player_id=player_id,
-                action_type="peng",
-                tiles=[tile]
-            )
-            self._game_state["actions_history"].append(action)
-            
-            # 广播状态更新
-            self._save_state()
-            return True
-        except Exception as e:
-            print(f"碰牌失败: {e}")
-            return False
-    
-    async def gang_tile(self, player_id: int, tile: Tile, gang_type: GangType, source_player_id: Optional[int] = None) -> bool:
-        """杠牌操作"""
-        try:
-            # 创建杠牌组
-            meld = Meld(
-                type=MeldType.GANG,
-                tiles=[tile, tile, tile, tile],
-                exposed=gang_type != GangType.AN_GANG,
-                gang_type=gang_type,
-                source_player=source_player_id if gang_type == GangType.MING_GANG else None
-            )
-            
-            # 添加到玩家的melds中
-            if player_id not in self._game_state["player_hands"]:
-                self._game_state["player_hands"][player_id] = HandTiles(tiles=[], melds=[])
-            
-            self._game_state["player_hands"][player_id].melds.append(meld)
-            
-            # 减少手牌
-            if gang_type == GangType.AN_GANG:
-                # 暗杠：减少4张
-                if player_id == 0:
-                    self._reduce_hand_tiles(player_id, 4, tile)
-                else:
-                    self._reduce_hand_tiles(player_id, 4, tile)
-            elif gang_type == GangType.MING_GANG:
-                # 直杠
-                if player_id == 0:
-                    self._reduce_hand_tiles(player_id, 3, tile)  # "我"减少3张
-                else:
-                    self._reduce_hand_tiles(player_id, 4, tile)  # 其他玩家减少4张
-            elif gang_type == GangType.JIA_GANG:
-                # 加杠：减少1张
-                self._reduce_hand_tiles(player_id, 1, tile)
-            
-            # 记录操作历史
-            action = PlayerAction(
-                player_id=player_id,
-                action_type=f"gang_{gang_type.value}",
-                tiles=[tile]
-            )
-            self._game_state["actions_history"].append(action)
-            
-            # 广播状态更新
-            self._save_state()
-            return True
-        except Exception as e:
-            print(f"杠牌失败: {e}")
-            return False
-    
-    def _reduce_hand_tiles(self, player_id: int, count: int, preferred_tile: Optional[Tile] = None):
-        """减少玩家手牌"""
-        if player_id not in self._game_state["player_hands"]:
-            return
-        
-        hand_tiles = self._game_state["player_hands"][player_id].tiles
-        
-        # 确保手牌足够
-        while len(hand_tiles) < count:
-            # 如果手牌不够，添加通用牌
-            generic_tile = Tile(type=TileType.WAN, value=1)
-            hand_tiles.append(generic_tile)
-        
-        # 减少指定数量的牌
-        for _ in range(count):
-            if len(hand_tiles) == 0:
-                break
-                
-            # 优先移除指定类型的牌
-            if preferred_tile:
-                for i, tile in enumerate(hand_tiles):
-                    if tile.type == preferred_tile.type and tile.value == preferred_tile.value:
-                        hand_tiles.pop(i)
-                        break
-                else:
-                    # 没找到指定牌，移除第一张
-                    if hand_tiles:
-                        hand_tiles.pop(0)
-            else:
-                # 移除第一张牌
-                hand_tiles.pop(0)
-    
     def process_operation(self, request: TileOperationRequest) -> Tuple[bool, str]:
         """处理游戏操作"""
         try:
-            # 如果指定了game_id，检查是否与当前游戏匹配
-            if request.game_id and self._game_state.get("game_id") != request.game_id:
-                return False, f"游戏ID不匹配: {request.game_id}"
-
             if request.operation_type == "hand":
-                # 添加手牌操作
+                # 添加手牌
                 success = self.add_tile_to_hand(request.player_id, request.tile)
                 return success, "添加手牌成功" if success else "添加手牌失败"
+                
             elif request.operation_type == "discard":
-                return self._handle_discard(request)
+                # 弃牌
+                success = self.discard_tile(request.player_id, request.tile)
+                return success, "弃牌成功" if success else "弃牌失败"
+                
             elif request.operation_type == "peng":
+                # 碰牌
                 return self._handle_peng(request)
-            elif request.operation_type in ["gang", "angang", "zhigang", "jiagang"]:
+                
+            elif request.operation_type in ["angang", "zhigang", "jiagang"]:
+                # 杠牌
                 return self._handle_gang(request)
+                
             else:
                 return False, f"不支持的操作类型: {request.operation_type}"
+                
         except Exception as e:
-            return False, str(e)
+            return False, f"操作失败: {str(e)}"
     
     def _initialize_tile_pool(self) -> List[Dict]:
-        """初始化牌库（108张：万、条、筒各36张）"""
+        """初始化牌库"""
         tiles = []
-        # 生成万、条、筒
         for tile_type in ["wan", "tiao", "tong"]:
-            for value in range(1, 10):  # 1-9
-                for _ in range(4):      # 每种4张
+            for value in range(1, 10):
+                for _ in range(4):  # 每种牌4张
                     tiles.append({
                         "type": tile_type,
                         "value": value
                     })
-        # 随机打乱
-        import random
-        random.shuffle(tiles)
         return tiles
     
     def _create_initial_state(self) -> Dict[str, Any]:
         """创建初始游戏状态"""
         return {
-            "game_id": str(uuid.uuid4()),  # 添加 game_id 字段
+            "game_id": str(uuid.uuid4()),
             "player_hands": {
-                "0": {"tiles": [], "melds": []},
-                "1": {"tiles": [], "melds": []},
-                "2": {"tiles": [], "melds": []},
-                "3": {"tiles": [], "melds": []}
+                "0": {"tiles": [], "tile_count": 0, "melds": []},  # 我：存储具体牌面
+                "1": {"tiles": None, "tile_count": 0, "melds": []},  # 其他玩家：只存储数量
+                "2": {"tiles": None, "tile_count": 0, "melds": []},
+                "3": {"tiles": None, "tile_count": 0, "melds": []}
             },
-            "discarded_tiles": [],  # 弃牌池
+            "discarded_tiles": [],  # 所有弃牌（可见）
             "player_discarded_tiles": {
                 "0": [], "1": [], "2": [], "3": []
-            },  # 每个玩家的弃牌
+            },  # 每个玩家的弃牌（可见）
             "actions_history": [],  # 操作历史
             "current_player": 0,  # 当前玩家
             "game_started": False,  # 游戏是否开始
             "last_action": None,  # 最后一个动作
             "tile_pool": self._initialize_tile_pool(),  # 牌池
-            "test_mode": True,  # 测试模式，跳过回合检查
             "players": {  # 玩家信息
                 "0": {"position": "我"},
                 "1": {"position": "下家"},
@@ -355,102 +261,133 @@ class MahjongGameService:
         }
     
     def start_game(self) -> Tuple[bool, str]:
-        """开始游戏，发牌"""
+        """开始游戏"""
         try:
-            if self._game_state["game_started"]:
-                return False, "游戏已经开始"
-            
-            # 为每个玩家发13张牌
-            for player_id in range(4):
-                for _ in range(13):
-                    if not self._game_state["tile_pool"]:
-                        return False, "牌库不足"
-                    # 从牌库抽牌
-                    tile = self._game_state["tile_pool"].pop()
-                    # 添加到玩家手牌
-                    self._game_state["player_hands"][str(player_id)]["tiles"].append(tile)
-            
             self._game_state["game_started"] = True
-            # 保存状态
             self._save_state()
-            return True, "游戏开始，发牌完成"
-            
+            return True, "游戏开始"
         except Exception as e:
             return False, f"开始游戏失败: {str(e)}"
     
     def draw_tile(self, player_id: int) -> Tuple[bool, str, Optional[Dict]]:
         """摸牌"""
         try:
-            if not self._game_state["game_started"]:
-                return False, "游戏尚未开始", None
-            
             if not self._game_state["tile_pool"]:
                 return False, "牌库已空", None
             
-            # 从牌库抽牌
             tile = self._game_state["tile_pool"].pop()
-            # 添加到玩家手牌
-            self._game_state["player_hands"][str(player_id)]["tiles"].append(tile)
+            player_id_str = str(player_id)
             
-            # 保存状态
-            self._save_state()
-            return True, "摸牌成功", tile
-            
+            if player_id == 0:
+                # 我：添加具体牌面到手牌
+                self._game_state["player_hands"][player_id_str]["tiles"].append(tile)
+                self._game_state["player_hands"][player_id_str]["tile_count"] = len(
+                    self._game_state["player_hands"][player_id_str]["tiles"]
+                )
+                print(f"✅ 我（玩家0）摸牌: {tile['value']}{tile['type']}")
+                return True, "摸牌成功", tile
+            else:
+                # 其他玩家：只增加手牌数量
+                self._game_state["player_hands"][player_id_str]["tile_count"] += 1
+                print(f"✅ 玩家{player_id}摸牌，手牌数量+1 (当前:{self._game_state['player_hands'][player_id_str]['tile_count']}张)")
+                return True, "摸牌成功", None  # 不返回具体牌面
+                
         except Exception as e:
             return False, f"摸牌失败: {str(e)}", None
     
     def _handle_discard(self, request: TileOperationRequest) -> Tuple[bool, str]:
         """处理弃牌操作"""
-        try:
-            player_id = str(request.player_id)
+        success = self.discard_tile(request.player_id, request.tile)
+        return success, "弃牌成功" if success else "弃牌失败"
+    
+    def _remove_tiles_from_my_hand(self, tile: Tile, count: int) -> int:
+        """从我的手牌中移除指定数量的牌"""
+        player_hand = self._game_state["player_hands"]["0"]["tiles"]
+        
+        removed = 0
+        for i in range(len(player_hand) - 1, -1, -1):  # 从后往前遍历
+            if removed >= count:
+                break
+            hand_tile = player_hand[i]
+            if (hand_tile["type"] == tile.type and 
+                hand_tile["value"] == tile.value):
+                player_hand.pop(i)
+                removed += 1
+                print(f"🗑️ 从我的手牌移除{tile.value}{tile.type} ({removed}/{count})")
+        
+        # 更新手牌数量
+        self._game_state["player_hands"]["0"]["tile_count"] = len(player_hand)
+        return removed
+    
+    def _reduce_other_player_hand_count(self, player_id: int, count: int):
+        """减少其他玩家的手牌数量"""
+        player_id_str = str(player_id)
+        current_count = self._game_state["player_hands"][player_id_str]["tile_count"]
+        new_count = max(0, current_count - count)
+        self._game_state["player_hands"][player_id_str]["tile_count"] = new_count
+        print(f"🔢 玩家{player_id}手牌数量: {current_count} → {new_count} (减少{count}张)")
+    
+    def _auto_draw_tile_for_player(self, player_id: int):
+        """为玩家自动摸一张牌"""
+        if self._game_state["tile_pool"]:
+            tile = self._game_state["tile_pool"].pop()
             
-            # 检查是否是当前玩家的回合（测试模式可跳过）
-            test_mode = self._game_state.get("test_mode", False)
-            if not test_mode and self._game_state["current_player"] != request.player_id:
-                return False, "不是该玩家的回合"
+            if player_id == 0:
+                # 我：添加具体牌面
+                self._game_state["player_hands"]["0"]["tiles"].append(tile)
+                self._game_state["player_hands"]["0"]["tile_count"] = len(
+                    self._game_state["player_hands"]["0"]["tiles"]
+                )
+                print(f"🎯 我（玩家0）自动摸牌: {tile['value']}{tile['type']}")
+            else:
+                # 其他玩家：只增加数量
+                self._game_state["player_hands"][str(player_id)]["tile_count"] += 1
+                print(f"🎯 玩家{player_id}自动摸牌，手牌数量+1")
             
-            # 添加弃牌到玩家的弃牌列表
-            if player_id not in self._game_state["player_discarded_tiles"]:
-                self._game_state["player_discarded_tiles"][player_id] = []
-            
-            tile_dict = request.tile.dict()
-            self._game_state["player_discarded_tiles"][player_id].append(tile_dict)
-            
-            # 添加到全局弃牌池
-            if "discarded_tiles" not in self._game_state:
-                self._game_state["discarded_tiles"] = []
-            self._game_state["discarded_tiles"].append(tile_dict)
-            
-            # 更新最后的操作
-            self._game_state["last_action"] = {
-                "type": "discard",
-                "player": player_id,
-                "tile": tile_dict,
-                "timestamp": datetime.now().timestamp()
-            }
-            
-            # 更新当前玩家（循环到下一个玩家），测试模式下可选择性跳过
-            if not test_mode:
-                self._game_state["current_player"] = (request.player_id + 1) % 4
-            
-            # 保存状态到Redis
-            self._save_state()
-            
-            return True, "弃牌成功"
-        except Exception as e:
-            print(f"弃牌失败: {e}")
-            return False, f"弃牌失败: {str(e)}"
+            return tile
+        else:
+            print(f"⚠️ 牌库已空，无法为玩家{player_id}摸牌")
+            return None
     
     def _handle_peng(self, request: TileOperationRequest) -> Tuple[bool, str]:
-        """处理碰牌操作"""
+        """处理碰牌操作
+        
+        真实逻辑：
+        - 我：从手牌移除2张，减少手牌数量3张（碰牌后自动出1张）
+        - 其他玩家：只减少手牌数量3张
+        """
         try:
-            player_id = str(request.player_id)
+            player_id = request.player_id
+            player_id_str = str(player_id)
             
             # 确保玩家手牌结构存在
-            if player_id not in self._game_state["player_hands"]:
-                self._game_state["player_hands"][player_id] = {"tiles": [], "melds": []}
+            if player_id_str not in self._game_state["player_hands"]:
+                if player_id == 0:
+                    self._game_state["player_hands"][player_id_str] = {"tiles": [], "tile_count": 0, "melds": []}
+                else:
+                    self._game_state["player_hands"][player_id_str] = {"tiles": None, "tile_count": 0, "melds": []}
             
-            # 创建碰牌组
+            print(f"🀄 玩家{player_id}碰牌{request.tile.value}{request.tile.type}")
+            
+            if player_id == 0:
+                # 我：检查并移除手牌中的2张牌
+                removed = self._remove_tiles_from_my_hand(request.tile, 2)
+                if removed < 2:
+                    return False, f"手牌中没有足够的{request.tile.value}{request.tile.type}进行碰牌"
+                
+                # 碰牌后自动出1张牌（模拟）
+                if self._game_state["player_hands"]["0"]["tiles"]:
+                    discarded_tile = self._game_state["player_hands"]["0"]["tiles"].pop(0)
+                    self._game_state["player_hands"]["0"]["tile_count"] = len(
+                        self._game_state["player_hands"]["0"]["tiles"]
+                    )
+                    print(f"🎯 我碰牌后自动出牌: {discarded_tile['value']}{discarded_tile['type']}")
+                
+            else:
+                # 其他玩家：只减少手牌数量3张
+                self._reduce_other_player_hand_count(player_id, 3)
+            
+            # 创建碰牌组（对所有人可见）
             meld = {
                 "id": str(uuid.uuid4()),
                 "type": "peng",
@@ -467,7 +404,7 @@ class MahjongGameService:
             }
             
             # 添加到玩家的melds中
-            self._game_state["player_hands"][player_id]["melds"].append(meld)
+            self._game_state["player_hands"][player_id_str]["melds"].append(meld)
             
             # 记录操作历史
             if "actions_history" not in self._game_state:
@@ -476,10 +413,13 @@ class MahjongGameService:
             action = {
                 "player_id": request.player_id,
                 "action_type": "peng",
-                "tiles": [request.tile.dict()],
+                "tile": request.tile.dict(),  # 碰牌操作对所有人可见
+                "source_player": request.source_player_id,
                 "timestamp": datetime.now().timestamp()
             }
             self._game_state["actions_history"].append(action)
+            
+            print(f"✅ 玩家{player_id}碰牌完成")
             
             # 保存状态
             self._save_state()
@@ -490,13 +430,23 @@ class MahjongGameService:
             return False, f"碰牌失败: {str(e)}"
     
     def _handle_gang(self, request: TileOperationRequest) -> Tuple[bool, str]:
-        """处理杠牌操作"""
+        """处理杠牌操作
+        
+        真实逻辑：
+        - 暗杠：只有我可以进行，其他玩家的暗杠不可见
+        - 直杠：减少相应手牌数量，杠牌组对所有人可见
+        - 加杠：在已有碰牌基础上进行
+        """
         try:
-            player_id = str(request.player_id)
+            player_id = request.player_id
+            player_id_str = str(player_id)
             
             # 确保玩家手牌结构存在
-            if player_id not in self._game_state["player_hands"]:
-                self._game_state["player_hands"][player_id] = {"tiles": [], "melds": []}
+            if player_id_str not in self._game_state["player_hands"]:
+                if player_id == 0:
+                    self._game_state["player_hands"][player_id_str] = {"tiles": [], "tile_count": 0, "melds": []}
+                else:
+                    self._game_state["player_hands"][player_id_str] = {"tiles": None, "tile_count": 0, "melds": []}
             
             # 根据operation_type确定杠牌类型
             gang_type_map = {
@@ -506,6 +456,72 @@ class MahjongGameService:
             }
             
             gang_type = gang_type_map.get(request.operation_type, "an_gang")
+            print(f"🀄 玩家{player_id}{gang_type}杠牌{request.tile.value}{request.tile.type}")
+            
+            # 处理不同类型的杠牌
+            original_peng_id = None
+            exposed = True  # 默认明杠
+            
+            if request.operation_type == "jiagang":
+                # 加杠：查找已有的碰牌并移除
+                for meld_item in self._game_state["player_hands"][player_id_str]["melds"]:
+                    if (meld_item["type"] == "peng" and 
+                        len(meld_item["tiles"]) > 0 and
+                        meld_item["tiles"][0]["type"] == request.tile.type and
+                        meld_item["tiles"][0]["value"] == request.tile.value):
+                        original_peng_id = meld_item["id"]
+                        self._game_state["player_hands"][player_id_str]["melds"].remove(meld_item)
+                        print(f"🔄 移除原有碰牌组{original_peng_id}")
+                        break
+                
+                # 加杠：从手牌移除1张牌，摸1张牌
+                if player_id == 0:
+                    removed = self._remove_tiles_from_my_hand(request.tile, 1)
+                    if removed < 1:
+                        return False, f"手牌中没有{request.tile.value}{request.tile.type}进行加杠"
+                else:
+                    self._reduce_other_player_hand_count(player_id, 1)
+                
+                # 摸1张牌
+                self._auto_draw_tile_for_player(player_id)
+                
+            elif request.operation_type == "angang":
+                # 暗杠：只有我可以进行，且只对我可见
+                if player_id != 0:
+                    return False, "其他玩家的暗杠不可见，无法处理"
+                
+                # 从我的手牌移除4张牌
+                removed = self._remove_tiles_from_my_hand(request.tile, 4)
+                if removed < 4:
+                    return False, f"手牌中没有足够的{request.tile.value}{request.tile.type}进行暗杠"
+                
+                # 摸1张牌
+                self._auto_draw_tile_for_player(0)
+                
+                exposed = False  # 暗杠不对其他人可见
+                
+            elif request.operation_type == "zhigang":
+                # 直杠：从手牌移除3张牌，摸1张牌，出1张牌
+                if player_id == 0:
+                    removed = self._remove_tiles_from_my_hand(request.tile, 3)
+                    if removed < 3:
+                        return False, f"手牌中没有足够的{request.tile.value}{request.tile.type}进行直杠"
+                else:
+                    self._reduce_other_player_hand_count(player_id, 3)
+                
+                # 摸1张牌
+                self._auto_draw_tile_for_player(player_id)
+                
+                # 出1张牌（模拟）
+                if player_id == 0 and self._game_state["player_hands"]["0"]["tiles"]:
+                    discarded_tile = self._game_state["player_hands"]["0"]["tiles"].pop(0)
+                    self._game_state["player_hands"]["0"]["tile_count"] = len(
+                        self._game_state["player_hands"]["0"]["tiles"]
+                    )
+                    print(f"🎯 我直杠后自动出牌: {discarded_tile['value']}{discarded_tile['type']}")
+                elif player_id != 0:
+                    # 其他玩家出牌，只减少数量
+                    self._reduce_other_player_hand_count(player_id, 1)
             
             # 创建杠牌组
             meld = {
@@ -517,28 +533,15 @@ class MahjongGameService:
                     request.tile.dict(),
                     request.tile.dict()
                 ],
-                "exposed": gang_type != "an_gang",
+                "exposed": exposed,
                 "gang_type": gang_type,
                 "source_player": request.source_player_id if gang_type == "ming_gang" else None,
-                "original_peng_id": None,
+                "original_peng_id": original_peng_id,
                 "timestamp": datetime.now().timestamp()
             }
             
-            # 处理加杠特殊情况
-            if request.operation_type == "jiagang":
-                # 查找已有的碰牌
-                for meld_item in self._game_state["player_hands"][player_id]["melds"]:
-                    if (meld_item["type"] == "peng" and 
-                        len(meld_item["tiles"]) > 0 and
-                        meld_item["tiles"][0]["type"] == request.tile.type and
-                        meld_item["tiles"][0]["value"] == request.tile.value):
-                        # 找到对应的碰牌，记录ID并移除
-                        meld["original_peng_id"] = meld_item["id"]
-                        self._game_state["player_hands"][player_id]["melds"].remove(meld_item)
-                        break
-            
             # 添加到玩家的melds中
-            self._game_state["player_hands"][player_id]["melds"].append(meld)
+            self._game_state["player_hands"][player_id_str]["melds"].append(meld)
             
             # 记录操作历史
             if "actions_history" not in self._game_state:
@@ -547,10 +550,13 @@ class MahjongGameService:
             action = {
                 "player_id": request.player_id,
                 "action_type": f"gang_{gang_type}",
-                "tiles": [request.tile.dict()],
+                "tile": request.tile.dict() if exposed else None,  # 暗杠不记录具体牌面
+                "source_player": request.source_player_id if gang_type == "ming_gang" else None,
                 "timestamp": datetime.now().timestamp()
             }
             self._game_state["actions_history"].append(action)
+            
+            print(f"✅ 玩家{player_id}杠牌完成 ({gang_type})")
             
             # 保存状态
             self._save_state()

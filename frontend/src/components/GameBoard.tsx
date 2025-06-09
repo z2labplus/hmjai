@@ -45,8 +45,9 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
     
     // 打印每个玩家的详细信息
     Object.entries(gameState.player_hands).forEach(([playerId, hand]) => {
+      const handTileCount = hand.tile_count !== undefined ? hand.tile_count : (hand.tiles?.length || 0);
       console.log(`玩家${playerId}:`, {
-        手牌数量: hand.tiles.length,
+        手牌数量: handTileCount,
         碰杠数量: hand.melds.length,
         碰杠详情: hand.melds.map(meld => ({
           类型: meld.type,

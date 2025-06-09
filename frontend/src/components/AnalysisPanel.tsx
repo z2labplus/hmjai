@@ -18,7 +18,8 @@ const AnalysisPanel: React.FC<AnalysisPanelProps> = ({ className }) => {
   
   // 执行分析
   const handleAnalyze = async () => {
-    if (gameState.player_hands[0].tiles.length === 0) {
+    const myHand = gameState.player_hands[0];
+    if (!myHand || !myHand.tiles || myHand.tiles.length === 0) {
       setError('请先添加手牌');
       return;
     }
