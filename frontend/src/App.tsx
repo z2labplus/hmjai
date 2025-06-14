@@ -49,8 +49,8 @@ function App() {
       try {
         console.log('🔗 初始化WebSocket连接...');
         
-        // 初始化WebSocket客户端
-        await initWebSocket('ws://localhost:8000/api/ws', 'default');
+        // 初始化WebSocket客户端 - 使用与测试脚本相同的房间ID
+        await initWebSocket('ws://localhost:8000/api/ws', 'test_room');
         
         // 连接到WebSocket服务器
         await connect();

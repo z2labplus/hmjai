@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useGameStore, selectAnalysis, selectIsAnalyzing } from '../stores/gameStore';
+import { useWebSocketGameStore } from '../stores/webSocketGameStore';
 import { MahjongAPI } from '../utils/api';
 import { codeToTile, TileType } from '../types/mahjong';
 import MahjongTile from './MahjongTile';
@@ -9,10 +9,10 @@ interface AnalysisPanelProps {
 }
 
 const AnalysisPanel: React.FC<AnalysisPanelProps> = ({ className }) => {
-  const gameState = useGameStore(state => state.gameState);
-  const analysisResult = useGameStore(selectAnalysis());
-  const isAnalyzing = useGameStore(selectIsAnalyzing());
-  const { setAnalysisResult, setIsAnalyzing } = useGameStore();
+  const gameState = useWebSocketGameStore(state => state.gameState);
+  const analysisResult = useWebSocketGameStore(state => state.analysisResult);
+  const isAnalyzing = useWebSocketGameStore(state => state.isAnalyzing);
+  const { setAnalysisResult, setIsAnalyzing } = useWebSocketGameStore();
   
   const [error, setError] = useState<string | null>(null);
   

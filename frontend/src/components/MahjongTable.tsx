@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useGameStore, selectPlayerHand } from '../stores/gameStore';
+import { useWebSocketGameStore } from '../stores/webSocketGameStore';
 import { calculateRemainingTiles, calculateRemainingTilesByType, TileType } from '../types/mahjong';
 import { Tile, MeldType, GangType, HandTiles } from '../types/mahjong';
 import MahjongTile from './MahjongTile';
@@ -13,8 +13,8 @@ interface MahjongTableProps {
 }
 
 const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 'elegant' }) => {
-  const gameState = useGameStore(state => state.gameState);
-  const { reorderPlayerHand, removeTileFromHand, addDiscardedTile } = useGameStore(state => ({
+  const gameState = useWebSocketGameStore(state => state.gameState);
+  const { reorderPlayerHand, removeTileFromHand, addDiscardedTile } = useWebSocketGameStore(state => ({
     reorderPlayerHand: state.reorderPlayerHand,
     removeTileFromHand: state.removeTileFromHand,
     addDiscardedTile: state.addDiscardedTile

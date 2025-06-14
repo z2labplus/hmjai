@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useGameStore } from '../stores/gameStore';
-import MahjongApiClient from '../services/MahjongApiClient';
+import { useWebSocketGameStore } from '../stores/webSocketGameStore';
 
 interface MissingSuitControlProps {
   className?: string;
 }
 
 const MissingSuitControl: React.FC<MissingSuitControlProps> = ({ className }) => {
-  const gameState = useGameStore(state => state.gameState);
-  const { setPlayerMissingSuit, getMissingSuits } = useGameStore();
+  const gameState = useWebSocketGameStore(state => state.gameState);
+  const { setPlayerMissingSuit, setMissingSuit, resetMissingSuits } = useWebSocketGameStore();
   const [isLoading, setIsLoading] = useState(false);
 
   const playerNames = ['0我', '1下家', '2对家', '3上家'];
@@ -28,13 +27,8 @@ const MissingSuitControl: React.FC<MissingSuitControlProps> = ({ className }) =>
   const handleSetMissingSuit = async (playerId: number, missingSuit: 'wan' | 'tiao' | 'tong') => {
     setIsLoading(true);
     try {
-      const response = await MahjongApiClient.setMissingSuit(playerId, missingSuit);
-      if (response.success) {
-        setPlayerMissingSuit(playerId, missingSuit);
-        console.log(`✅ 玩家${playerId}定缺设置成功: ${missingSuit}`);
-      } else {
-        console.error('❌ 定缺设置失败:', response.message);
-      }
+      await setMissingSuit(playerId, missingSuit);
+      console.log(`✅ 玩家${playerId}定缺设置成功: ${missingSuit}`);
     } catch (error) {
       console.error('❌ 定缺API调用失败:', error);
     } finally {
@@ -46,11 +40,9 @@ const MissingSuitControl: React.FC<MissingSuitControlProps> = ({ className }) =>
   const handleClearMissingSuit = async (playerId: number) => {
     setIsLoading(true);
     try {
-      const response = await MahjongApiClient.setMissingSuit(playerId, null as any);
-      if (response.success) {
-        setPlayerMissingSuit(playerId, null);
-        console.log(`✅ 玩家${playerId}定缺清除成功`);
-      }
+      // 使用本地方法清除
+      setPlayerMissingSuit(playerId, null);
+      console.log(`✅ 玩家${playerId}定缺清除成功`);
     } catch (error) {
       console.error('❌ 清除定缺失败:', error);
     } finally {
@@ -62,14 +54,8 @@ const MissingSuitControl: React.FC<MissingSuitControlProps> = ({ className }) =>
   const handleResetAll = async () => {
     setIsLoading(true);
     try {
-      const response = await MahjongApiClient.resetMissingSuits();
-      if (response.success) {
-        // 清除所有玩家的定缺
-        for (let i = 0; i < 4; i++) {
-          setPlayerMissingSuit(i, null);
-        }
-        console.log('✅ 所有玩家定缺已重置');
-      }
+      await resetMissingSuits();
+      console.log('✅ 所有定缺重置成功');
     } catch (error) {
       console.error('❌ 重置定缺失败:', error);
     } finally {
