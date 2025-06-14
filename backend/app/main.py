@@ -18,13 +18,14 @@ app.add_middleware(
 # 导入路由
 from .api import mahjong
 from .api.v1 import replay
+from .websocket import routes as websocket_routes
 
-# 注册路由
+# 注册HTTP API路由
 app.include_router(mahjong.router, prefix="/api/mahjong", tags=["mahjong"])
 app.include_router(replay.router, prefix="/api/v1/replay", tags=["replay"])
 
-# WebSocket路由 (通过前缀挂载)
-app.include_router(mahjong.router, prefix="/ws", tags=["websocket"])
+# 注册WebSocket路由
+app.include_router(websocket_routes.router, prefix="/api", tags=["websocket"])
 
 # 静态文件服务（如果需要）
 if os.path.exists("static"):
@@ -56,6 +57,7 @@ async def startup_event():
     """应用启动时的初始化"""
     print("🀄 欢乐麻将辅助工具 API 已启动")
     print("📚 API文档地址: http://localhost:8000/docs")
+    print("🔌 WebSocket连接地址: ws://localhost:8000/api/ws")
 
 
 @app.on_event("shutdown") 

@@ -48,7 +48,7 @@ def main():
     # 启动FastAPI服务器
     uvicorn.run(
         "app.main:app",
-        host=settings.API_HOST,
+        host=settings.REDIS_HOST,
         port=settings.API_PORT,
         reload=settings.DEBUG,
         log_level=settings.LOG_LEVEL.lower()
