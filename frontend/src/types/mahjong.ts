@@ -38,6 +38,11 @@ export interface HandTiles {
   tiles: Tile[] | null;  // 其他玩家为null，只有我（玩家0）有具体牌面
   tile_count: number;     // 手牌数量（必需字段）
   melds: Meld[];
+  missing_suit?: string | null;  // 定缺花色：wan/tiao/tong
+  is_winner?: boolean;    // 是否胜利
+  win_type?: 'zimo' | 'dianpao';  // 胜利类型：自摸或点炮
+  win_tile?: Tile;        // 胡牌牌
+  dianpao_player_id?: number;  // 点炮者ID（仅点炮胡牌时有效）
 }
 
 export interface PlayerAction {
@@ -86,6 +91,14 @@ export interface TileInfo {
   type: string;
   value: number;
   display: string;
+}
+
+// 胜利者信息接口
+export interface Winner {
+  player_id: number;
+  win_type: 'zimo' | 'dianpao';
+  win_tile?: Tile;
+  dianpao_player_id?: number;
 }
 
 // 输入模式枚举

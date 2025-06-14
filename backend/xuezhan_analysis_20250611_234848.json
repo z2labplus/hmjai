@@ -1,0 +1,1253 @@
+{
+  "game_info": {
+    "timestamp": "20250611_234848",
+    "mode": "腾讯欢乐麻将血战到底",
+    "players": {
+      "0": "我(庄家)",
+      "1": "下家",
+      "2": "对家",
+      "3": "上家"
+    },
+    "total_rounds": 20
+  },
+  "game_record": {
+    "game_info": {
+      "game_id": "7f0ec970-ec1c-412d-b684-087796047e5a",
+      "start_time": "2025-06-11T23:48:48.425447",
+      "player_count": 4,
+      "game_mode": "xuezhan_daodi",
+      "export_time": "2025-06-11T23:48:48.425447"
+    },
+    "players": {
+      "0": {
+        "name": "我",
+        "position": "我"
+      },
+      "1": {
+        "name": "下家",
+        "position": "下家"
+      },
+      "2": {
+        "name": "对家",
+        "position": "对家"
+      },
+      "3": {
+        "name": "上家",
+        "position": "上家"
+      }
+    },
+    "missing_suits": {
+      "0": "tiao",
+      "1": "tong",
+      "2": "wan",
+      "3": "wan"
+    },
+    "actions": [
+      {
+        "type": "add_hand",
+        "player_id": 0,
+        "tile": {
+          "type": "wan",
+          "value": 1
+        },
+        "timestamp": 1749656163.011747
+      },
+      {
+        "type": "add_hand",
+        "player_id": 0,
+        "tile": {
+          "type": "wan",
+          "value": 1
+        },
+        "timestamp": 1749656165.08677
+      },
+      {
+        "type": "add_hand",
+        "player_id": 0,
+        "tile": {
+          "type": "wan",
+          "value": 2
+        },
+        "timestamp": 1749656167.166522
+      },
+      {
+        "type": "add_hand",
+        "player_id": 0,
+        "tile": {
+          "type": "wan",
+          "value": 2
+        },
+        "timestamp": 1749656169.247434
+      },
+      {
+        "type": "add_hand",
+        "player_id": 0,
+        "tile": {
+          "type": "wan",
+          "value": 3
+        },
+        "timestamp": 1749656171.328679
+      },
+      {
+        "type": "add_hand",
+        "player_id": 0,
+        "tile": {
+          "type": "wan",
+          "value": 3
+        },
+        "timestamp": 1749656173.400852
+      },
+      {
+        "type": "add_hand",
+        "player_id": 0,
+        "tile": {
+          "type": "wan",
+          "value": 4
+        },
+        "timestamp": 1749656175.48132
+      },
+      {
+        "type": "add_hand",
+        "player_id": 0,
+        "tile": {
+          "type": "wan",
+          "value": 7
+        },
+        "timestamp": 1749656214.918438
+      },
+      {
+        "type": "add_hand",
+        "player_id": 0,
+        "tile": {
+          "type": "wan",
+          "value": 8
+        },
+        "timestamp": 1749656216.996907
+      },
+      {
+        "type": "add_hand",
+        "player_id": 0,
+        "tile": {
+          "type": "tong",
+          "value": 5
+        },
+        "timestamp": 1749656219.072251
+      },
+      {
+        "type": "add_hand",
+        "player_id": 0,
+        "tile": {
+          "type": "tong",
+          "value": 5
+        },
+        "timestamp": 1749656221.1599
+      },
+      {
+        "type": "add_hand",
+        "player_id": 0,
+        "tile": {
+          "type": "tong",
+          "value": 5
+        },
+        "timestamp": 1749656223.22176
+      },
+      {
+        "type": "add_hand",
+        "player_id": 0,
+        "tile": {
+          "type": "tong",
+          "value": 5
+        },
+        "timestamp": 1749656225.313752
+      },
+      {
+        "type": "add_hand",
+        "player_id": 0,
+        "tile": {
+          "type": "tong",
+          "value": 9
+        },
+        "timestamp": 1749656227.403122
+      },
+      {
+        "player_id": 0,
+        "action_type": "discard",
+        "tile": {
+          "type": "tong",
+          "value": 9,
+          "id": null
+        },
+        "timestamp": 1749656312.364187
+      },
+      {
+        "player_id": 1,
+        "action_type": "discard",
+        "tile": {
+          "type": "tong",
+          "value": 8,
+          "id": null
+        },
+        "timestamp": 1749656365.355814
+      },
+      {
+        "player_id": 2,
+        "action_type": "discard",
+        "tile": {
+          "type": "tong",
+          "value": 4,
+          "id": null
+        },
+        "timestamp": 1749656374.166881
+      },
+      {
+        "player_id": 3,
+        "action_type": "discard",
+        "tile": {
+          "type": "tong",
+          "value": 9,
+          "id": null
+        },
+        "timestamp": 1749656384.49538
+      },
+      {
+        "type": "add_hand",
+        "player_id": 0,
+        "tile": {
+          "type": "wan",
+          "value": 5
+        },
+        "timestamp": 1749656391.406773
+      },
+      {
+        "player_id": 0,
+        "action_type": "discard",
+        "tile": {
+          "type": "wan",
+          "value": 8,
+          "id": null
+        },
+        "timestamp": 1749656393.468222
+      },
+      {
+        "player_id": 1,
+        "action_type": "discard",
+        "tile": {
+          "type": "wan",
+          "value": 2,
+          "id": null
+        },
+        "timestamp": 1749656401.813245
+      },
+      {
+        "player_id": 0,
+        "action_type": "peng",
+        "tile": {
+          "type": "wan",
+          "value": 2,
+          "id": null
+        },
+        "source_player": 1,
+        "timestamp": 1749656406.430797
+      },
+      {
+        "player_id": 0,
+        "action_type": "discard",
+        "tile": {
+          "type": "wan",
+          "value": 7,
+          "id": null
+        },
+        "timestamp": 1749656414.73365
+      },
+      {
+        "player_id": 1,
+        "action_type": "discard",
+        "tile": {
+          "type": "tong",
+          "value": 2,
+          "id": null
+        },
+        "timestamp": 1749656425.570395
+      },
+      {
+        "player_id": 2,
+        "action_type": "discard",
+        "tile": {
+          "type": "tiao",
+          "value": 8,
+          "id": null
+        },
+        "timestamp": 1749656436.865805
+      },
+      {
+        "player_id": 3,
+        "action_type": "discard",
+        "tile": {
+          "type": "wan",
+          "value": 5,
+          "id": null
+        },
+        "timestamp": 1749656443.533807
+      },
+      {
+        "player_id": 0,
+        "action_type": "gang_an_gang",
+        "tile": null,
+        "source_player": null,
+        "timestamp": 1749656448.170295
+      },
+      {
+        "type": "add_hand",
+        "player_id": 0,
+        "tile": {
+          "type": "tiao",
+          "value": 1
+        },
+        "timestamp": 1749656450.243727
+      },
+      {
+        "player_id": 0,
+        "action_type": "discard",
+        "tile": {
+          "type": "tiao",
+          "value": 1,
+          "id": null
+        },
+        "timestamp": 1749656452.286139
+      },
+      {
+        "player_id": 1,
+        "action_type": "discard",
+        "tile": {
+          "type": "tong",
+          "value": 3,
+          "id": null
+        },
+        "timestamp": 1749656465.898594
+      },
+      {
+        "player_id": 2,
+        "action_type": "discard",
+        "tile": {
+          "type": "wan",
+          "value": 8,
+          "id": null
+        },
+        "timestamp": 1749656476.040069
+      },
+      {
+        "type": "add_hand",
+        "player_id": 0,
+        "tile": {
+          "type": "wan",
+          "value": 9
+        },
+        "timestamp": 1749656681.305122
+      },
+      {
+        "player_id": 0,
+        "action_type": "discard",
+        "tile": {
+          "type": "wan",
+          "value": 9,
+          "id": null
+        },
+        "timestamp": 1749656683.38819
+      },
+      {
+        "player_id": 2,
+        "action_type": "discard",
+        "tile": {
+          "type": "tiao",
+          "value": 7,
+          "id": null
+        },
+        "timestamp": 1749656694.185386
+      }
+    ],
+    "final_state": {
+      "player_hands": {
+        "0": {
+          "tiles": [
+            {
+              "type": "wan",
+              "value": 1
+            },
+            {
+              "type": "wan",
+              "value": 1
+            },
+            {
+              "type": "wan",
+              "value": 3
+            },
+            {
+              "type": "wan",
+              "value": 3
+            },
+            {
+              "type": "wan",
+              "value": 4
+            },
+            {
+              "type": "wan",
+              "value": 5
+            },
+            {
+              "type": "tong",
+              "value": 9
+            }
+          ],
+          "tile_count": 7,
+          "melds": [
+            {
+              "id": "94dcb23b-2044-4883-9289-62304790a11a",
+              "type": "peng",
+              "tiles": [
+                {
+                  "type": "wan",
+                  "value": 2,
+                  "id": null
+                },
+                {
+                  "type": "wan",
+                  "value": 2,
+                  "id": null
+                },
+                {
+                  "type": "wan",
+                  "value": 2,
+                  "id": null
+                }
+              ],
+              "exposed": true,
+              "gang_type": null,
+              "source_player": 1,
+              "original_peng_id": null,
+              "timestamp": 1749656406.430797
+            },
+            {
+              "id": "2a0bd8fc-59b4-4ac8-9ed6-8e3fdd573727",
+              "type": "gang",
+              "tiles": [
+                {
+                  "type": "tong",
+                  "value": 5,
+                  "id": null
+                },
+                {
+                  "type": "tong",
+                  "value": 5,
+                  "id": null
+                },
+                {
+                  "type": "tong",
+                  "value": 5,
+                  "id": null
+                },
+                {
+                  "type": "tong",
+                  "value": 5,
+                  "id": null
+                }
+              ],
+              "exposed": false,
+              "gang_type": "an_gang",
+              "source_player": null,
+              "original_peng_id": null,
+              "timestamp": 1749656448.170295
+            }
+          ],
+          "missing_suit": "tiao"
+        },
+        "1": {
+          "tiles": null,
+          "tile_count": 13,
+          "melds": [],
+          "missing_suit": "tong"
+        },
+        "2": {
+          "tiles": null,
+          "tile_count": 13,
+          "melds": [],
+          "missing_suit": "wan"
+        },
+        "3": {
+          "tiles": null,
+          "tile_count": 13,
+          "melds": [],
+          "missing_suit": "wan"
+        }
+      },
+      "player_discarded_tiles": {
+        "0": [
+          {
+            "type": "tong",
+            "value": 9,
+            "id": null
+          },
+          {
+            "type": "wan",
+            "value": 8,
+            "id": null
+          },
+          {
+            "type": "wan",
+            "value": 7,
+            "id": null
+          },
+          {
+            "type": "tiao",
+            "value": 1,
+            "id": null
+          },
+          {
+            "type": "wan",
+            "value": 9,
+            "id": null
+          }
+        ],
+        "1": [
+          {
+            "type": "tong",
+            "value": 8,
+            "id": null
+          },
+          {
+            "type": "tong",
+            "value": 2,
+            "id": null
+          },
+          {
+            "type": "tong",
+            "value": 3,
+            "id": null
+          }
+        ],
+        "2": [
+          {
+            "type": "tong",
+            "value": 4,
+            "id": null
+          },
+          {
+            "type": "tiao",
+            "value": 8,
+            "id": null
+          },
+          {
+            "type": "wan",
+            "value": 8,
+            "id": null
+          },
+          {
+            "type": "tiao",
+            "value": 7,
+            "id": null
+          }
+        ],
+        "3": [
+          {
+            "type": "tong",
+            "value": 9,
+            "id": null
+          },
+          {
+            "type": "wan",
+            "value": 5,
+            "id": null
+          }
+        ]
+      },
+      "discarded_tiles": [
+        {
+          "type": "tong",
+          "value": 9,
+          "id": null
+        },
+        {
+          "type": "tong",
+          "value": 8,
+          "id": null
+        },
+        {
+          "type": "tong",
+          "value": 4,
+          "id": null
+        },
+        {
+          "type": "tong",
+          "value": 9,
+          "id": null
+        },
+        {
+          "type": "wan",
+          "value": 8,
+          "id": null
+        },
+        {
+          "type": "wan",
+          "value": 7,
+          "id": null
+        },
+        {
+          "type": "tong",
+          "value": 2,
+          "id": null
+        },
+        {
+          "type": "tiao",
+          "value": 8,
+          "id": null
+        },
+        {
+          "type": "wan",
+          "value": 5,
+          "id": null
+        },
+        {
+          "type": "tiao",
+          "value": 1,
+          "id": null
+        },
+        {
+          "type": "tong",
+          "value": 3,
+          "id": null
+        },
+        {
+          "type": "wan",
+          "value": 8,
+          "id": null
+        },
+        {
+          "type": "wan",
+          "value": 9,
+          "id": null
+        },
+        {
+          "type": "tiao",
+          "value": 7,
+          "id": null
+        }
+      ]
+    },
+    "statistics": {
+      "total_actions": 34,
+      "action_types": {
+        "unknown": 17,
+        "discard": 15,
+        "peng": 1,
+        "gang_an_gang": 1
+      },
+      "players_hu_count": 0
+    }
+  },
+  "my_decision_analysis": {
+    "total_decisions": 5,
+    "correct_decisions": 5,
+    "accuracy": 100.0,
+    "decision_details": [
+      {
+        "round": 1,
+        "situation": "弃牌选择",
+        "my_hand": [
+          [
+            "wan",
+            1
+          ],
+          [
+            "wan",
+            1
+          ],
+          [
+            "wan",
+            2
+          ],
+          [
+            "wan",
+            2
+          ],
+          [
+            "wan",
+            3
+          ],
+          [
+            "wan",
+            3
+          ],
+          [
+            "wan",
+            4
+          ],
+          [
+            "wan",
+            7
+          ],
+          [
+            "wan",
+            8
+          ],
+          [
+            "tong",
+            5
+          ],
+          [
+            "tong",
+            5
+          ],
+          [
+            "tong",
+            5
+          ],
+          [
+            "tong",
+            5
+          ],
+          [
+            "tong",
+            9
+          ]
+        ],
+        "my_choice": [
+          "tong",
+          9
+        ],
+        "analysis": {
+          "best_discard": [
+            "tong",
+            9
+          ],
+          "worst_discard": [
+            "tong",
+            5
+          ],
+          "all_options": [
+            {
+              "card": [
+                "tong",
+                9
+              ],
+              "score": 40.0,
+              "reason": "边张，不易成顺"
+            },
+            {
+              "card": [
+                "wan",
+                8
+              ],
+              "score": 80.0,
+              "reason": "搭子，等成顺"
+            },
+            {
+              "card": [
+                "wan",
+                7
+              ],
+              "score": 80.0,
+              "reason": "搭子，等成顺"
+            },
+            {
+              "card": [
+                "wan",
+                4
+              ],
+              "score": 95.0,
+              "reason": "搭子，等成顺"
+            },
+            {
+              "card": [
+                "wan",
+                1
+              ],
+              "score": 110.0,
+              "reason": "成对，等碰牌"
+            },
+            {
+              "card": [
+                "wan",
+                3
+              ],
+              "score": 120.0,
+              "reason": "成对，等碰牌"
+            },
+            {
+              "card": [
+                "wan",
+                2
+              ],
+              "score": 120.0,
+              "reason": "成对，等碰牌"
+            },
+            {
+              "card": [
+                "tong",
+                5
+              ],
+              "score": 145.0,
+              "reason": "有3张，可暗杠"
+            }
+          ]
+        },
+        "is_optimal": true
+      },
+      {
+        "round": 5,
+        "situation": "弃牌选择",
+        "my_hand": [
+          [
+            "wan",
+            1
+          ],
+          [
+            "wan",
+            1
+          ],
+          [
+            "wan",
+            2
+          ],
+          [
+            "wan",
+            2
+          ],
+          [
+            "wan",
+            3
+          ],
+          [
+            "wan",
+            3
+          ],
+          [
+            "wan",
+            4
+          ],
+          [
+            "wan",
+            7
+          ],
+          [
+            "wan",
+            8
+          ],
+          [
+            "tong",
+            5
+          ],
+          [
+            "tong",
+            5
+          ],
+          [
+            "tong",
+            5
+          ],
+          [
+            "tong",
+            5
+          ],
+          [
+            "wan",
+            5
+          ]
+        ],
+        "my_choice": [
+          "wan",
+          8
+        ],
+        "analysis": {
+          "best_discard": [
+            "wan",
+            8
+          ],
+          "worst_discard": [
+            "tong",
+            5
+          ],
+          "all_options": [
+            {
+              "card": [
+                "wan",
+                8
+              ],
+              "score": 80.0,
+              "reason": "搭子，等成顺"
+            },
+            {
+              "card": [
+                "wan",
+                7
+              ],
+              "score": 80.0,
+              "reason": "搭子，等成顺"
+            },
+            {
+              "card": [
+                "wan",
+                5
+              ],
+              "score": 95.0,
+              "reason": "搭子，等成顺"
+            },
+            {
+              "card": [
+                "wan",
+                4
+              ],
+              "score": 95.0,
+              "reason": "搭子，等成顺"
+            },
+            {
+              "card": [
+                "wan",
+                1
+              ],
+              "score": 110.0,
+              "reason": "成对，等碰牌"
+            },
+            {
+              "card": [
+                "wan",
+                3
+              ],
+              "score": 120.0,
+              "reason": "成对，等碰牌"
+            },
+            {
+              "card": [
+                "wan",
+                2
+              ],
+              "score": 120.0,
+              "reason": "成对，等碰牌"
+            },
+            {
+              "card": [
+                "tong",
+                5
+              ],
+              "score": 145.0,
+              "reason": "有3张，可暗杠"
+            }
+          ]
+        },
+        "is_optimal": true
+      },
+      {
+        "round": 8,
+        "situation": "弃牌选择",
+        "my_hand": [
+          [
+            "wan",
+            1
+          ],
+          [
+            "wan",
+            1
+          ],
+          [
+            "wan",
+            3
+          ],
+          [
+            "wan",
+            3
+          ],
+          [
+            "wan",
+            4
+          ],
+          [
+            "wan",
+            7
+          ],
+          [
+            "tong",
+            5
+          ],
+          [
+            "tong",
+            5
+          ],
+          [
+            "tong",
+            5
+          ],
+          [
+            "tong",
+            5
+          ],
+          [
+            "wan",
+            5
+          ]
+        ],
+        "my_choice": [
+          "wan",
+          7
+        ],
+        "analysis": {
+          "best_discard": [
+            "wan",
+            7
+          ],
+          "worst_discard": [
+            "tong",
+            5
+          ],
+          "all_options": [
+            {
+              "card": [
+                "wan",
+                7
+              ],
+              "score": 50.0,
+              "reason": "孤立牌，优先弃掉"
+            },
+            {
+              "card": [
+                "wan",
+                1
+              ],
+              "score": 80.0,
+              "reason": "成对，等碰牌"
+            },
+            {
+              "card": [
+                "wan",
+                5
+              ],
+              "score": 95.0,
+              "reason": "搭子，等成顺"
+            },
+            {
+              "card": [
+                "wan",
+                4
+              ],
+              "score": 95.0,
+              "reason": "搭子，等成顺"
+            },
+            {
+              "card": [
+                "wan",
+                3
+              ],
+              "score": 120.0,
+              "reason": "成对，等碰牌"
+            },
+            {
+              "card": [
+                "tong",
+                5
+              ],
+              "score": 145.0,
+              "reason": "有3张，可暗杠"
+            }
+          ]
+        },
+        "is_optimal": true
+      },
+      {
+        "round": 13,
+        "situation": "弃牌选择",
+        "my_hand": [
+          [
+            "wan",
+            1
+          ],
+          [
+            "wan",
+            1
+          ],
+          [
+            "wan",
+            3
+          ],
+          [
+            "wan",
+            3
+          ],
+          [
+            "wan",
+            4
+          ],
+          [
+            "wan",
+            5
+          ],
+          [
+            "tiao",
+            1
+          ]
+        ],
+        "my_choice": [
+          "tiao",
+          1
+        ],
+        "analysis": {
+          "best_discard": [
+            "tiao",
+            1
+          ],
+          "worst_discard": [
+            "wan",
+            3
+          ],
+          "all_options": [
+            {
+              "card": [
+                "tiao",
+                1
+              ],
+              "score": 40.0,
+              "reason": "边张，不易成顺"
+            },
+            {
+              "card": [
+                "wan",
+                1
+              ],
+              "score": 80.0,
+              "reason": "成对，等碰牌"
+            },
+            {
+              "card": [
+                "wan",
+                5
+              ],
+              "score": 95.0,
+              "reason": "搭子，等成顺"
+            },
+            {
+              "card": [
+                "wan",
+                4
+              ],
+              "score": 95.0,
+              "reason": "搭子，等成顺"
+            },
+            {
+              "card": [
+                "wan",
+                3
+              ],
+              "score": 120.0,
+              "reason": "成对，等碰牌"
+            }
+          ]
+        },
+        "is_optimal": true
+      },
+      {
+        "round": 17,
+        "situation": "弃牌选择",
+        "my_hand": [
+          [
+            "wan",
+            1
+          ],
+          [
+            "wan",
+            1
+          ],
+          [
+            "wan",
+            3
+          ],
+          [
+            "wan",
+            3
+          ],
+          [
+            "wan",
+            4
+          ],
+          [
+            "wan",
+            5
+          ],
+          [
+            "wan",
+            9
+          ]
+        ],
+        "my_choice": [
+          "wan",
+          9
+        ],
+        "analysis": {
+          "best_discard": [
+            "wan",
+            9
+          ],
+          "worst_discard": [
+            "wan",
+            3
+          ],
+          "all_options": [
+            {
+              "card": [
+                "wan",
+                9
+              ],
+              "score": 40.0,
+              "reason": "边张，不易成顺"
+            },
+            {
+              "card": [
+                "wan",
+                1
+              ],
+              "score": 80.0,
+              "reason": "成对，等碰牌"
+            },
+            {
+              "card": [
+                "wan",
+                5
+              ],
+              "score": 95.0,
+              "reason": "搭子，等成顺"
+            },
+            {
+              "card": [
+                "wan",
+                4
+              ],
+              "score": 95.0,
+              "reason": "搭子，等成顺"
+            },
+            {
+              "card": [
+                "wan",
+                3
+              ],
+              "score": 120.0,
+              "reason": "成对，等碰牌"
+            }
+          ]
+        },
+        "is_optimal": true
+      }
+    ]
+  },
+  "deck_integrity": {
+    "final_deck_size": 81,
+    "used_tiles_count": 27,
+    "total_tiles": 108
+  },
+  "win_statistics": {
+    "winners": [
+      0,
+      1,
+      3
+    ],
+    "winner_names": [
+      "我(庄家)",
+      "下家",
+      "上家"
+    ]
+  }
+}

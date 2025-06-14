@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useGameStore, selectPlayerHand } from '../stores/gameStore';
 import { calculateRemainingTiles, calculateRemainingTilesByType, TileType } from '../types/mahjong';
-import { Tile, MeldType, GangType } from '../types/mahjong';
+import { Tile, MeldType, GangType, HandTiles } from '../types/mahjong';
 import MahjongTile from './MahjongTile';
 import SimpleSourceIndicator from './SimpleSourceIndicator';
 import { CardBackStyle } from './MahjongTile';
@@ -21,16 +21,30 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
   }));
   
   // 获取玩家手牌，如果不存在则返回空数组
-  const getPlayerHand = (playerId: number) => {
+  const getPlayerHand = (playerId: number): HandTiles => {
     const playerIdStr = playerId.toString();
     const hand = gameState.player_hands[playerIdStr];
     if (!hand) {
-      return { tiles: [], tile_count: 0, melds: [] };
+      return { 
+        tiles: [], 
+        tile_count: 0, 
+        melds: [],
+        missing_suit: null,
+        is_winner: false,
+        win_type: undefined,
+        win_tile: undefined,
+        dianpao_player_id: undefined
+      };
     }
     return {
       tiles: hand.tiles || [],
       tile_count: hand.tile_count || (hand.tiles?.length || 0),
-      melds: hand.melds || []
+      melds: hand.melds || [],
+      missing_suit: hand.missing_suit || null,
+      is_winner: hand.is_winner || false,
+      win_type: hand.win_type,
+      win_tile: hand.win_tile,
+      dianpao_player_id: hand.dianpao_player_id
     };
   };
   
@@ -89,14 +103,54 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
     return unplayedTotal;
   };
   
+  // 计算碰杠牌数量
+  const calculateMeldTilesCount = (melds: any[] | undefined): number => {
+    if (!melds) return 0;
+    return melds.reduce((total, meld) => total + (meld.tiles?.length || 0), 0);
+  };
+  
+  // 计算玩家区域需要的宽度
+  const calculatePlayerAreaWidth = () => {
+    // 获取所有玩家的手牌数量
+    const playerHandCounts = [
+      player0Hand.tile_count || (player0Hand.tiles?.length || 0),
+      player1Hand.tile_count || (player1Hand.tiles?.length || 0),
+      player2Hand.tile_count || (player2Hand.tiles?.length || 0),
+      player3Hand.tile_count || (player3Hand.tiles?.length || 0)
+    ];
+    
+    // 获取所有玩家的碰杠牌数量
+    const playerMeldCounts = [
+      calculateMeldTilesCount(player0Hand.melds),
+      calculateMeldTilesCount(player1Hand.melds),
+      calculateMeldTilesCount(player2Hand.melds),
+      calculateMeldTilesCount(player3Hand.melds)
+    ];
+    
+    // 计算每个玩家的总牌数（手牌 + 碰杠牌）
+    const totalTileCounts = playerHandCounts.map((handCount, index) => handCount + playerMeldCounts[index]);
+    
+    // 找出最大的牌数
+    const maxTileCount = Math.max(...totalTileCounts);
+    
+    // 确保牌数在13-20之间
+    const clampedTileCount = Math.min(Math.max(maxTileCount, 13), 20);
+    
+    // 计算宽度（每个麻将牌32px）
+    return `${clampedTileCount * 32}px`;
+  };
+  
+  // 获取动态宽度
+  const playerAreaWidth = calculatePlayerAreaWidth();
+  
   // 未出牌数：等于选择区域中显示的所有牌的右上角数字之和
   const unplayedTiles = calculateUnplayedTiles();
   
   const playerNames = ['0我', '1下家', '2对家', '3上家'];
   const playerColors = ['bg-blue-50 border-blue-200', 'bg-green-50 border-green-200', 'bg-red-50 border-red-200', 'bg-yellow-50 border-yellow-200'];
   
-  // 展示顺序：上家、我、下家、对家
-  const displayOrder = [3, 0, 1, 2];
+  // 展示顺序：对家、上家下家、我
+  const displayOrder = [2, 3, 1, 0];
 
   // 拖拽事件处理函数
   const handleDragStart = (e: React.DragEvent, index: number, playerId: number) => {
@@ -149,7 +203,7 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
     e.preventDefault();
     
     const playerHand = [player0Hand, player1Hand, player2Hand, player3Hand][playerId];
-    const newTiles = [...playerHand.tiles];
+    const newTiles = [...(playerHand.tiles || [])];
     
     // 移动牌到新位置
     const draggedTile = newTiles[draggedIndex];
@@ -204,22 +258,55 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
     );
   };
 
-  // 计算碰杠牌的总张数
-  const calculateMeldTilesCount = (melds: any[]) => {
-    return melds.reduce((total, meld) => total + meld.tiles.length, 0);
-  };
-
   // 渲染单个玩家区域
   const renderPlayerArea = (playerId: number) => {
     const hand = [player0Hand, player1Hand, player2Hand, player3Hand][playerId];
     const discards = [player0Discards, player1Discards, player2Discards, player3Discards][playerId];
     
+    // 检查是否是当前玩家（需要闪亮边框）
+    const isCurrentPlayer = gameState.current_player === playerId;
+    
+    // 动态类名：当前玩家有闪亮动画
+    const playerAreaClassName = `border-2 rounded-lg p-4 ${playerColors[playerId]} transition-all duration-200 hover:shadow-md ${
+      isCurrentPlayer 
+        ? 'current-player-glow' 
+        : ''
+    }`;
+    
     return (
-      <div className={`border-2 rounded-lg p-4 ${playerColors[playerId]} transition-all duration-200 hover:shadow-md`} style={{ height: '140px', }}>
+      <div className={playerAreaClassName} style={{ height: '140px', }}>
         {/* 玩家名称和统计信息 */}
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             <h3 className="text-lg font-bold text-gray-800">{playerNames[playerId]}</h3>
+            {/* 定缺显示 */}
+            {(() => {
+              try {
+                const playerIdStr = playerId.toString();
+                const playerHand = gameState?.player_hands?.[playerIdStr];
+                const missingSuit = playerHand?.missing_suit;
+                
+                if (missingSuit && missingSuit !== null && missingSuit !== '') {
+                  const suitDisplayNames = {
+                    'wan': '万',
+                    'tiao': '条', 
+                    'tong': '筒'
+                  };
+                  
+                  const displayName = suitDisplayNames[missingSuit as keyof typeof suitDisplayNames] || missingSuit;
+                  
+                  return (
+                    <span className="text-sm font-bold text-yellow-500 bg-yellow-50 px-2 py-1 rounded-md border border-yellow-300">
+                      {displayName}
+                    </span>
+                  );
+                }
+                return null;
+              } catch (error) {
+                console.warn('定缺显示错误:', error);
+                return null;
+              }
+            })()}
             <div className="text-sm text-gray-600">
               (手牌: {hand.tile_count || (hand.tiles?.length || 0)} | 碰杠: {calculateMeldTilesCount(hand.melds)} | 弃牌: {discards.length})
             </div>
@@ -302,6 +389,63 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
                 return null;
               })()}
               
+              {/* 胜利信息显示 */}
+              {hand.is_winner && (
+                <div className="flex items-center gap-2 ml-4">
+                  <motion.div
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ 
+                      type: "spring", 
+                      stiffness: 300, 
+                      damping: 20,
+                      delay: 0.2 
+                    }}
+                    className="flex items-center gap-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-3 py-1 rounded-full shadow-lg border-2 border-yellow-300"
+                  >
+                    {/* 胜利图标 */}
+                    <motion.span
+                      animate={{ 
+                        rotate: [0, 10, -10, 0],
+                        scale: [1, 1.1, 1]
+                      }}
+                      transition={{ 
+                        duration: 1.5, 
+                        repeat: Infinity, 
+                        ease: "easeInOut" 
+                      }}
+                      className="text-lg"
+                    >
+                      🏆
+                    </motion.span>
+                    
+                    {/* 胜利牌面 */}
+                    {hand.win_tile && (
+                      <div className="flex items-center gap-1">
+                                                 <span className="text-sm font-bold">
+                           {hand.win_tile.value}
+                           {hand.win_tile.type === TileType.WAN ? '万' : 
+                            hand.win_tile.type === TileType.TIAO ? '条' : 
+                            hand.win_tile.type === TileType.TONG ? '筒' : ''}
+                         </span>
+                      </div>
+                    )}
+                    
+                    {/* 胜利类型 */}
+                    <span className="text-sm font-bold">
+                      {hand.win_type === 'zimo' ? '自摸' : '点炮'}
+                    </span>
+                    
+                    {/* 点炮者信息 */}
+                    {hand.win_type === 'dianpao' && hand.dianpao_player_id !== undefined && (
+                      <span className="text-xs opacity-90">
+                        (点炮者: {playerNames[hand.dianpao_player_id]})
+                      </span>
+                    )}
+                  </motion.div>
+                </div>
+              )}
+              
               {/* 碰牌杠牌区域 - 组间有小间隙(gap-2) */}
               {hand.melds.length > 0 && (
                 <div style={{ display: 'flex', alignItems: 'flex-end' }}>
@@ -366,6 +510,24 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
                               />
                             )}
                             
+                            {/* 暗杠标识器 - 在第4张牌上显示"暗"字 */}
+                            {meld.type === MeldType.GANG && 
+                             meld.gang_type === GangType.AN_GANG && 
+                             tileIndex === 3 && (
+                              <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center shadow-sm">
+                                暗
+                              </div>
+                            )}
+                            
+                            {/* 加杠标识器 - 在第4张牌上显示"加"字 */}
+                            {meld.type === MeldType.GANG && 
+                             meld.gang_type === GangType.JIA_GANG && 
+                             tileIndex === 3 && (
+                              <div className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center shadow-sm">
+                                加
+                              </div>
+                            )}
+                            
                             {/* 碰牌来源指示器 - 只在第3张牌上显示 */}
                             {meld.type === MeldType.PENG && 
                              tileIndex === 2 && 
@@ -403,40 +565,68 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
       <div className="flex items-center justify-between mb-1">
         <h2 className="text-2xl font-bold text-gray-800">血战到底</h2>
         <div className="flex flex-col items-end gap-1">
-        <div className="flex items-center gap-4">
-          {/* 未出牌数 */}
-          <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2 shadow-sm border">
-            <span className="text-sm text-gray-600">未出牌数:</span>
-            <motion.div
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-              className="text-xl font-bold text-blue-600"
-            >
-              {unplayedTiles}
-            </motion.div>
-          </div>
-          {/* 剩余牌数 */}
-          <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2 shadow-sm border">
-            <span className="text-sm text-gray-600">剩余牌数:</span>
-            <motion.div
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              className="text-xl font-bold text-green-600"
-            >
-              {remainingTiles}
-            </motion.div>
+          <div className="flex items-center gap-4">
+            {/* 未出牌数 */}
+            <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2 shadow-sm border">
+              <span className="text-sm text-gray-600">未知牌数:</span>
+              <motion.div
+                animate={{ scale: [1, 1.05, 1] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+                className="text-xl font-bold text-blue-600"
+              >
+                {unplayedTiles}
+              </motion.div>
+            </div>
+            {/* 剩余牌数 */}
+            <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2 shadow-sm border">
+              <span className="text-sm text-gray-600">剩余牌数:</span>
+              <motion.div
+                animate={{ scale: [1, 1.05, 1] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                className="text-xl font-bold text-green-600"
+              >
+                {remainingTiles}
+              </motion.div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 玩家区域 - 单列布局，按顺序：上家、我、下家、对家 */}
-      <div className="space-y-1">
-        {displayOrder.map((playerId) => (
-          <div key={`player-${playerId}`}>
-            {renderPlayerArea(playerId)}
+      {/* 玩家区域 - 三行布局 */}
+      <div className="flex flex-col gap-4">
+        {/* 第一行：对家（居中） */}
+        <div className="flex justify-center">
+          <div style={{ width: playerAreaWidth }}>
+            {renderPlayerArea(2)}
           </div>
-        ))}
+        </div>
+        
+        {/* 第二行：上家和下家（左右分布）以及中间的剩余牌数 */}
+        <div className="flex items-center justify-center gap-4">
+          <div style={{ width: playerAreaWidth }}>
+            {renderPlayerArea(3)}
+          </div>
+          {/* 中间剩余牌数显示区域 */}
+          <div className="flex items-center justify-center bg-white rounded-lg p-2 shadow-md border border-gray-200 w-24 h-24 aspect-square">
+            <motion.div
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+              className="text-2xl font-bold text-green-600"
+            >
+              {remainingTiles}
+            </motion.div>
+          </div>
+          <div style={{ width: playerAreaWidth }}>
+            {renderPlayerArea(1)}
+          </div>
+        </div>
+        
+        {/* 第三行：我（居中） */}
+        <div className="flex justify-center">
+          <div style={{ width: playerAreaWidth }}>
+            {renderPlayerArea(0)}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import MahjongTile from './MahjongTile';
 import MahjongTable from './MahjongTable';
 import { CardBackStyle } from './MahjongTile';
 import MahjongApiClient from '../services/MahjongApiClient';
+import MissingSuitControl from './MissingSuitControl';
 
 interface GameBoardProps {
   className?: string;
@@ -30,7 +31,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
   
   const [selectedTiles, setSelectedTiles] = useState<Tile[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState<number>(0); // 默认选择上家（显示索引0）
-  const [operationType, setOperationType] = useState<'hand' | 'discard' | 'peng' | 'angang' | 'zhigang' | 'jiagang'>('hand');
+  const [operationType, setOperationType] = useState<'hand' | 'discard' | 'peng' | 'angang' | 'zhigang' | 'jiagang' | 'missing'>('hand');
   const [selectedSourcePlayer, setSelectedSourcePlayer] = useState<number | null>(null); // 新增：被杠玩家选择
   const [autoSync, setAutoSync] = useState(false);
   const autoSyncTimer = useRef<NodeJS.Timeout | null>(null);
@@ -94,6 +95,13 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
   for (let i = 1; i <= 9; i++) {
     availableTiles.push(createTile(TileType.TONG, i));
   }
+
+  // 用于界面显示的玩家顺序：上家、我、下家、对家
+  const displayOrder = [3, 0, 1, 2]; // 对应Player ID：上家=3，我=0，下家=1，对家=2
+  const playerNames = ['我', '下家', '对家', '上家']; // Player ID映射：0=我，1=下家，2=对家，3=上家
+  const playerColors = ['text-blue-600', 'text-green-600', 'text-red-600', 'text-yellow-600'];
+  const displayNames = displayOrder.map(id => playerNames[id]);
+  const displayColors = displayOrder.map(id => playerColors[id]);
 
   const handleTileClick = async (tile: Tile) => {
     const actualPlayerId = displayOrder[selectedPlayer]; // 转换显示索引为实际Player ID
@@ -193,6 +201,24 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
         // 其他玩家加杠：直接减少1张手牌（模拟真实场景）
         reduceHandTilesCount(actualPlayerId, 1, tile);
       }
+    } else if (operationType === 'missing') {
+      // 定缺操作：只能设置万、条、筒
+      if (['wan', 'tiao', 'tong'].includes(tile.type)) {
+        try {
+          const response = await MahjongApiClient.setMissingSuit(actualPlayerId, tile.type as 'wan' | 'tiao' | 'tong');
+          if (response.success) {
+            // 更新本地状态
+            useGameStore.getState().setPlayerMissingSuit(actualPlayerId, tile.type as 'wan' | 'tiao' | 'tong');
+            console.log(`✅ 玩家${actualPlayerId}定缺设置成功: ${tile.type}`);
+          } else {
+            console.error('❌ 定缺设置失败:', response.message);
+          }
+        } catch (error) {
+          console.error('❌ 定缺API调用失败:', error);
+        }
+      } else {
+        console.warn('❌ 定缺只能选择万、条、筒');
+      }
       }
     } catch (error) {
       console.error('操作失败:', error);
@@ -224,7 +250,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
   };
 
   // 处理操作类型改变
-  const handleOperationTypeChange = (newOperationType: 'hand' | 'discard' | 'peng' | 'angang' | 'zhigang' | 'jiagang') => {
+  const handleOperationTypeChange = (newOperationType: 'hand' | 'discard' | 'peng' | 'angang' | 'zhigang' | 'jiagang' | 'missing') => {
     setOperationType(newOperationType);
     // 如果不是直杠或碰牌操作，清除被杠/被碰玩家的选择
     if (newOperationType !== 'zhigang' && newOperationType !== 'peng') {
@@ -232,13 +258,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
     }
   };
 
-  const playerNames = ['我', '下家', '对家', '上家']; // Player ID映射：0=我，1=下家，2=对家，3=上家
-  const playerColors = ['text-blue-600', 'text-green-600', 'text-red-600', 'text-yellow-600'];
-  
-  // 用于界面显示的玩家顺序：上家、我、下家、对家
-  const displayOrder = [3, 0, 1, 2]; // 对应Player ID：上家=3，我=0，下家=1，对家=2
-  const displayNames = displayOrder.map(id => playerNames[id]);
-  const displayColors = displayOrder.map(id => playerColors[id]);
+
 
   // 获取可选择的被杠玩家（排除当前杠牌的玩家）
   const getAvailableSourcePlayers = () => {
@@ -248,15 +268,16 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
   };
 
   // 获取操作类型的中文名称
-  const getOperationName = (type: 'hand' | 'discard' | 'peng' | 'angang' | 'zhigang' | 'jiagang'): string => {
-    const operationMap = {
-      'hand': '添加手牌',
-      'discard': '弃牌',
-      'peng': '碰牌',
-      'angang': '暗杠',
-      'zhigang': '直杠',
-      'jiagang': '加杠'
-    };
+  const getOperationName = (type: 'hand' | 'discard' | 'peng' | 'angang' | 'zhigang' | 'jiagang' | 'missing'): string => {
+          const operationMap = {
+        'hand': '添加手牌',
+        'discard': '弃牌',
+        'peng': '碰牌',
+        'angang': '暗杠',
+        'zhigang': '直杠',
+        'jiagang': '加杠',
+        'missing': '定缺'
+      };
     return operationMap[type] || type;
   };
 
@@ -272,6 +293,8 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
       <div className="bg-white rounded-lg p-3 border border-gray-300 mb-3">
         <MahjongTable cardBackStyle={cardBackStyle} />
       </div>
+
+
       
 
       
@@ -279,8 +302,34 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
       <div className="mb-3 flex-shrink-0">
         <div className="flex flex-col gap-3">
           
-          {/* 第一行：选择玩家和选择操作 */}
+          {/* 第一行：当前玩家、选择玩家和选择操作 */}
           <div className="flex items-center gap-6 flex-wrap">
+            {/* 当前玩家指示器和控制 */}
+            <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
+              <span className="text-sm font-medium text-orange-700 min-w-max">
+                🎯 当前玩家:
+              </span>
+              <div className="flex items-center gap-2">
+                <span className={`px-2 py-1 rounded-md text-sm font-bold bg-orange-100 text-orange-800 current-player-indicator`}>
+                  {playerNames[gameState.current_player || 0]}
+                </span>
+                <button
+                  onClick={async () => {
+                    const result = await useGameStore.getState().nextPlayer();
+                    if (result.success) {
+                      console.log('✅ 切换到下一个玩家:', result.message);
+                    } else {
+                      console.error('❌ 切换玩家失败:', result.message);
+                    }
+                  }}
+                  className="px-2 py-1 bg-orange-200 hover:bg-orange-300 text-orange-800 rounded-md text-xs font-medium transition-colors"
+                  title="切换到下一个玩家"
+                >
+                  下一个
+                </button>
+              </div>
+            </div>
+
             {/* 第一步：选择玩家 */}
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium text-gray-700 min-w-max">
@@ -369,6 +418,16 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
                 >
                   加杠
                 </button>
+                <button
+                  onClick={() => handleOperationTypeChange('missing')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    operationType === 'missing'
+                      ? 'bg-white text-yellow-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  定缺
+                </button>
               </div>
             </div>
           </div>
@@ -420,15 +479,29 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
         
         {/* 所有麻将牌一列显示 */}
         <div>
+          {operationType === 'missing' && (
+            <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+              <p className="text-sm text-yellow-700">
+                <strong>定缺操作:</strong> 请点击任意一张万、条或筒的牌来设置该玩家的定缺花色
+              </p>
+            </div>
+          )}
+          
           <div className="flex gap-0.5 flex-wrap">
             {availableTiles
               .filter(tile => {
+                // 定缺操作时只显示万、条、筒各一张，其他操作按原逻辑
+                if (operationType === 'missing') {
+                  // 只显示每种花色的第一张牌（用于选择花色）
+                  return tile.value === 1;
+                }
+                
                 // 只显示剩余数量大于0的牌
                 const remainingCount = getTileRemainingCount(tile);
                 return remainingCount > 0;
               })
               .map((tile, index) => {
-                const remainingCount = getTileRemainingCount(tile);
+                const remainingCount = operationType === 'missing' ? undefined : getTileRemainingCount(tile);
                 return (
                   <MahjongTile
                     key={`tile-${tile.type}-${tile.value}`}
@@ -489,6 +562,11 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
             </div>
           </div>
         </div>
+      </div>
+
+            {/* 定缺控制区域 */}
+      <div className="mb-3">
+        <MissingSuitControl />
       </div>
     </div>
   );

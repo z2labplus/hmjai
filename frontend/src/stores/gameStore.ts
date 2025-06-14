@@ -10,9 +10,10 @@ import {
   MeldType,
   Meld,
   TileType,
-  GangType
+  GangType,
+  Winner
 } from '../types/mahjong';
-import MahjongApiClient from '../services/apiClient';
+import MahjongApiClient from '../services/MahjongApiClient';
 
 interface GameStore {
   // 游戏状态
@@ -52,6 +53,17 @@ interface GameStore {
   syncToBackend: () => Promise<void>;
   setApiConnectionStatus: (connected: boolean) => void;
   checkApiConnection: () => Promise<boolean>;
+  
+  // 胜利检测
+  checkForWinners: () => Promise<Winner[]>;
+  
+  // 定缺相关功能
+  setPlayerMissingSuit: (playerId: number, missingSuit: 'wan' | 'tiao' | 'tong' | null) => void;
+  getMissingSuits: () => Promise<void>;
+
+  // 当前玩家控制
+  setCurrentPlayer: (playerId: number) => Promise<{ success: boolean; message: string }>;
+  nextPlayer: () => Promise<{ success: boolean; message: string; previousPlayer?: number; currentPlayer?: number }>;
   
   // 重置功能
   resetGame: () => void;
@@ -226,9 +238,10 @@ export const useGameStore = create<GameStore>()(
     
     addMeld: (playerId, meld) => set((state) => {
       const newGameState = { ...state.gameState };
-      const playerHand = { ...newGameState.player_hands[playerId] };
-      playerHand.melds = [...playerHand.melds, meld];
-      newGameState.player_hands[playerId] = playerHand;
+      const playerIdStr = playerId.toString();
+      const playerHand = { ...newGameState.player_hands[playerIdStr] } || { tiles: playerId === 0 ? [] : null, tile_count: 0, melds: [] };
+      playerHand.melds = [...(playerHand.melds || []), meld];
+      newGameState.player_hands[playerIdStr] = playerHand;
       
       return { gameState: newGameState };
     }),
@@ -265,20 +278,130 @@ export const useGameStore = create<GameStore>()(
         // 先检查健康状态
         const isHealthy = await MahjongApiClient.checkHealth();
         if (!isHealthy) {
-          throw new Error('后端服务不可用');
+          console.warn('⚠️ 后端健康检查失败，使用默认状态');
+          set({ isApiConnected: false });
+          return; // 直接返回，不抛出错误
         }
         
-        const backendState = await MahjongApiClient.getGameState();
+        const response = await MahjongApiClient.getGameState();
+        
+        console.log('🔍 后端响应详情:', response);
+        
+        // 处理后端的响应格式 (GameOperationResponse)
+        let backendGameState;
+        let isSuccess = false;
+        
+        if (response && typeof response === 'object') {
+          // 后端返回格式: { success, message, game_state }
+          if (response.success === true && response.game_state) {
+            backendGameState = response.game_state;
+            isSuccess = true;
+            console.log('✅ 后端返回成功:', response.message);
+          }
+          // 后端返回失败但有game_state
+          else if (response.success === false && response.game_state) {
+            backendGameState = response.game_state;
+            isSuccess = true; // 虽然后端说失败，但有数据就算成功
+            console.warn('⚠️ 后端返回失败，但使用返回的状态:', response.message);
+          }
+          // 检查是否有默认的game_state格式
+          else if (response.game_state) {
+            backendGameState = response.game_state;
+            isSuccess = true;
+            console.log('📋 使用后端返回的游戏状态');
+          }
+          // 没有有效数据，保持当前状态
+          else {
+            console.warn('⚠️ 后端返回无效数据，保持当前状态');
+            backendGameState = get().gameState;
+            isSuccess = false;
+          }
+        } else {
+          console.error('❌ 后端返回数据格式无效');
+          backendGameState = get().gameState;
+          isSuccess = false;
+        }
+        
+        // 确保关键字段存在，提供完整的默认值
+        const defaultState = get().gameState || {
+          game_id: 'default',
+          player_hands: {
+            '0': { tiles: [], tile_count: 0, melds: [], missing_suit: null },
+            '1': { tiles: null, tile_count: 0, melds: [], missing_suit: null },
+            '2': { tiles: null, tile_count: 0, melds: [], missing_suit: null },
+            '3': { tiles: null, tile_count: 0, melds: [], missing_suit: null }
+          },
+          player_discarded_tiles: {
+            '0': [], '1': [], '2': [], '3': []
+          },
+          discarded_tiles: [],
+          actions_history: [],
+          current_player: 0,
+          game_started: false
+        };
+        
+        const safeGameState = {
+          ...defaultState, // 使用默认值作为基础
+          ...backendGameState, // 覆盖后端数据
+          // 确保player_hands格式正确
+          player_hands: {
+            '0': {
+              ...defaultState.player_hands['0'],
+              ...(backendGameState?.player_hands?.['0'] || {})
+            },
+            '1': {
+              ...defaultState.player_hands['1'],
+              ...(backendGameState?.player_hands?.['1'] || {})
+            },
+            '2': {
+              ...defaultState.player_hands['2'],
+              ...(backendGameState?.player_hands?.['2'] || {})
+            },
+            '3': {
+              ...defaultState.player_hands['3'],
+              ...(backendGameState?.player_hands?.['3'] || {})
+            }
+          }
+        };
+        
         set({
-          gameState: backendState,
-          isApiConnected: true,
+          gameState: safeGameState,
+          isApiConnected: isSuccess,
           lastSyncTime: new Date()
         });
-        console.log('✅ 从后端同步状态成功');
+        
+        if (isSuccess) {
+          console.log('✅ 从后端同步状态成功', safeGameState);
+        } else {
+          console.log('⚠️ 从后端同步状态（使用缓存）', safeGameState);
+        }
       } catch (error) {
         console.error('❌ 从后端同步状态失败:', error);
+        
+        // 确保有基本的游戏状态，即使出错也不崩溃
+        const currentState = get().gameState;
+        if (!currentState || !currentState.player_hands) {
+          const fallbackState = {
+            game_id: 'offline',
+            player_hands: {
+              '0': { tiles: [], tile_count: 0, melds: [], missing_suit: null },
+              '1': { tiles: null, tile_count: 0, melds: [], missing_suit: null },
+              '2': { tiles: null, tile_count: 0, melds: [], missing_suit: null },
+              '3': { tiles: null, tile_count: 0, melds: [], missing_suit: null }
+            },
+            player_discarded_tiles: {
+              '0': [], '1': [], '2': [], '3': []
+            },
+            discarded_tiles: [],
+            actions_history: [],
+            current_player: 0,
+            game_started: false
+          };
+          set({ gameState: fallbackState });
+        }
+        
         set({ isApiConnected: false });
-        throw error; // 重新抛出错误以便UI处理
+        // 不重新抛出错误，避免界面崩溃
       }
     },
     
@@ -319,19 +442,147 @@ export const useGameStore = create<GameStore>()(
         set({ isApiConnected: false });
         return false;
       }
+    },
+
+    // 检查胜利者
+    checkForWinners: async (): Promise<Winner[]> => {
+      try {
+        const gameState = get().gameState;
+        const winners: Winner[] = [];
+        
+        Object.entries(gameState.player_hands).forEach(([playerId, hand]) => {
+          if (hand.is_winner && hand.win_type) {
+            winners.push({
+              player_id: parseInt(playerId),
+              win_type: hand.win_type,
+              win_tile: hand.win_tile,
+              dianpao_player_id: hand.dianpao_player_id
+            });
+          }
+        });
+        
+        return winners;
+      } catch (error) {
+        console.error('❌ 检查胜利者失败:', error);
+        return [];
+      }
+    },
+
+    // 定缺相关功能实现
+    setPlayerMissingSuit: (playerId: number, missingSuit: 'wan' | 'tiao' | 'tong' | null) => 
+      set((state) => {
+        const newGameState = { ...state.gameState };
+        const playerIdStr = playerId.toString();
+        
+        // 确保玩家存在
+        if (!newGameState.player_hands[playerIdStr]) {
+          newGameState.player_hands[playerIdStr] = {
+            tiles: playerId === 0 ? [] : null,
+            tile_count: 0,
+            melds: []
+          };
+        }
+        
+        // 设置定缺
+        newGameState.player_hands[playerIdStr] = {
+          ...newGameState.player_hands[playerIdStr],
+          missing_suit: missingSuit
+        };
+        
+        return { gameState: newGameState };
+      }),
+
+    getMissingSuits: async () => {
+      try {
+        const response = await MahjongApiClient.getMissingSuits();
+        if (response.success && response.data) {
+          // 更新本地状态
+          set((state) => {
+            const newGameState = { ...state.gameState };
+            
+            Object.entries(response.data.missing_suits || {}).forEach(([playerId, missingSuit]) => {
+              if (newGameState.player_hands[playerId]) {
+                newGameState.player_hands[playerId] = {
+                  ...newGameState.player_hands[playerId],
+                  missing_suit: missingSuit as string | null
+                };
+              }
+            });
+            
+            return { gameState: newGameState };
+          });
+        }
+      } catch (error) {
+        console.error('❌ 获取定缺信息失败:', error);
+        throw error;
+      }
+    },
+
+    // 当前玩家控制功能实现
+    setCurrentPlayer: async (playerId: number) => {
+      try {
+        const response = await MahjongApiClient.setCurrentPlayer(playerId);
+        if (response.success) {
+          // 更新本地状态
+          set((state) => ({
+            gameState: {
+              ...state.gameState,
+              current_player: playerId
+            }
+          }));
+          return { success: true, message: response.message };
+        } else {
+          return { success: false, message: response.message };
+        }
+      } catch (error) {
+        console.error('❌ 设置当前玩家失败:', error);
+        return { 
+          success: false, 
+          message: error instanceof Error ? error.message : '设置当前玩家失败' 
+        };
+      }
+    },
+
+    nextPlayer: async () => {
+      try {
+        const response = await MahjongApiClient.nextPlayer();
+        if (response.success) {
+          // 更新本地状态
+          set((state) => ({
+            gameState: {
+              ...state.gameState,
+              current_player: response.current_player
+            }
+          }));
+          return { 
+            success: true, 
+            message: response.message,
+            previousPlayer: response.previous_player,
+            currentPlayer: response.current_player 
+          };
+        } else {
+          return { success: false, message: response.message };
+        }
+      } catch (error) {
+        console.error('❌ 切换玩家失败:', error);
+        return { 
+          success: false, 
+          message: error instanceof Error ? error.message : '切换玩家失败' 
+        };
+      }
     }
   }))
 );
 
 // 选择器函数，用于获取特定数据
 export const selectPlayerHand = (playerId: number) => (state: GameStore) => 
-  state.gameState.player_hands[playerId];
+  state.gameState.player_hands?.[playerId] || { tiles: playerId === 0 ? [] : null, tile_count: 0, melds: [] };
 
 export const selectMyHand = () => (state: GameStore) => 
-  state.gameState.player_hands[0]; // 假设玩家ID为0
+  state.gameState.player_hands?.[0] || { tiles: [], tile_count: 0, melds: [] }; // 假设玩家ID为0
 
 export const selectDiscardedTiles = () => (state: GameStore) => 
-  state.gameState.discarded_tiles;
+  state.gameState.discarded_tiles || [];
 
 export const selectPlayerDiscardedTiles = (playerId: number) => (state: GameStore) => 
   state.gameState.player_discarded_tiles?.[playerId] || [];

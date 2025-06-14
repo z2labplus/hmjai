@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Optional
 import json
 from datetime import datetime
@@ -9,14 +9,14 @@ from ..models.mahjong import (
     ResetGameResponse, GangType
 )
 from ..algorithms.mahjong_analyzer import MahjongAnalyzer
-from ..services.game_manager import GameManager
+# from ..services.game_manager import GameManager  # WebSocket已移除
 from ..services.mahjong_game_service import MahjongGameService
 
 router = APIRouter(tags=["mahjong"])
 
 # 创建全局实例
 analyzer = MahjongAnalyzer()
-game_manager = GameManager()
+# game_manager = GameManager()  # WebSocket已移除
 game_service = MahjongGameService()
 
 
@@ -137,11 +137,7 @@ async def reset_game():
         game_service.reset_game()
         current_state = game_service.get_game_state()
         
-        # 广播游戏状态更新
-        await game_manager.broadcast({
-            "type": "game_state_update",
-            "data": current_state
-        })
+        # 游戏状态已更新，前端可通过API获取
         
         return {
             "success": True,
@@ -180,11 +176,7 @@ async def discard_tile(
             # 获取更新后的游戏状态
             current_state = game_service.get_game_state()
             
-            # 广播游戏状态更新
-            await game_manager.broadcast({
-                "type": "game_state_update",
-                "data": current_state
-            })
+            # 游戏状态已更新，前端可通过API获取
             
             return {
                 "success": True,
@@ -244,18 +236,19 @@ async def add_hand_count(
     player_id: int,
     count: int = 1
 ):
-    """为其他玩家增加手牌数量（不指定具体牌面）
+    """为其他玩家修改手牌数量（不指定具体牌面）
     
     注意：
     - 只能用于其他玩家（1、2、3）
     - 玩家0（我）请使用 add-hand-tile 接口
+    - count可以为正数（增加）或负数（减少）
     """
     try:
         if player_id == 0:
             raise ValueError("玩家0（我）请使用 add-hand-tile 接口添加具体牌面")
         
-        if count <= 0:
-            raise ValueError("数量必须大于0")
+        if count == 0:
+            raise ValueError("数量不能为0")
         
         # 获取当前游戏状态
         current_state = game_service.get_game_state()
@@ -269,17 +262,26 @@ async def add_hand_count(
                 "melds": []
             }
         
-        # 增加手牌数量
-        current_state["player_hands"][player_id_str]["tile_count"] += count
+        # 修改手牌数量（可以增加或减少）
+        if count > 0:
+            current_state["player_hands"][player_id_str]["tile_count"] += count
+            action_msg = f"玩家{player_id}手牌数量+{count}"
+        else:
+            # 减少手牌数量，但不能低于0
+            current_count = current_state["player_hands"][player_id_str]["tile_count"]
+            new_count = max(0, current_count + count)  # count是负数
+            current_state["player_hands"][player_id_str]["tile_count"] = new_count
+            actual_change = new_count - current_count
+            action_msg = f"玩家{player_id}手牌数量{actual_change:+d}"
         
         # 保存状态
         game_service.set_game_state_dict(current_state)
         
         return {
             "success": True,
-            "message": f"玩家{player_id}手牌数量+{count}",
+            "message": action_msg,
             "player_id": player_id,
-            "added_count": count,
+            "change_count": count,
             "total_count": current_state["player_hands"][player_id_str]["tile_count"]
         }
         
@@ -395,15 +397,8 @@ async def get_api_info():
 async def get_connections():
     """获取所有已连接的客户端和游戏信息"""
     try:
-        # 获取所有已连接的客户端
+        # WebSocket已移除，返回空的客户端列表
         clients = []
-        for client_id, websocket in game_manager.active_connections.items():
-            client_info = {
-                "client_id": client_id,
-                "connected_at": datetime.now().isoformat(),  # 实际应该存储真实的连接时间
-                "ip_address": websocket.client.host if hasattr(websocket, 'client') else "unknown"
-            }
-            clients.append(client_info)
         
         # 获取所有活跃的游戏
         games = []
@@ -447,4 +442,395 @@ async def set_test_mode(enabled: bool = True):
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"设置测试模式失败: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"设置测试模式失败: {str(e)}")
+
+
+# ============ 定缺相关 API ============
+
+@router.post("/set-missing-suit")
+async def set_missing_suit(
+    player_id: int,
+    missing_suit: str
+):
+    """设置玩家定缺花色"""
+    try:
+        # 验证花色是否有效
+        valid_suits = ["wan", "tiao", "tong"]
+        if missing_suit not in valid_suits:
+            return {
+                "success": False,
+                "message": f"无效的花色，必须是: {', '.join(valid_suits)}"
+            }
+        
+        # 获取当前游戏状态
+        current_state = game_service.get_game_state()
+        player_id_str = str(player_id)
+        
+        # 确保玩家存在
+        if player_id_str not in current_state.get("player_hands", {}):
+            current_state.setdefault("player_hands", {})[player_id_str] = {
+                "tiles": None,
+                "tile_count": 0,
+                "melds": [],
+                "missing_suit": None
+            }
+        
+        # 设置定缺
+        current_state["player_hands"][player_id_str]["missing_suit"] = missing_suit
+        
+        # 保存状态
+        success = game_service.set_game_state_dict(current_state)
+        
+        if success:
+            # WebSocket已移除，不再广播
+            # await game_manager.broadcast({
+            #     "type": "missing_suit_update",
+            #     "data": {
+            #         "player_id": player_id,
+            #         "missing_suit": missing_suit,
+            #         "game_state": current_state
+            #     }
+            # })
+            
+            return {
+                "success": True,
+                "message": f"玩家{player_id}定缺设置成功: {missing_suit}",
+                "player_id": player_id,
+                "missing_suit": missing_suit,
+                "game_state": current_state
+            }
+        else:
+            return {
+                "success": False,
+                "message": "设置定缺失败"
+            }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"设置定缺失败: {str(e)}")
+
+
+@router.get("/missing-suits")
+async def get_missing_suits():
+    """获取所有玩家的定缺信息"""
+    try:
+        current_state = game_service.get_game_state()
+        missing_suits = {}
+        
+        for player_id, hand in current_state.get("player_hands", {}).items():
+            missing_suits[player_id] = hand.get("missing_suit", None)
+        
+        return {
+            "success": True,
+            "message": "获取定缺信息成功",
+            "missing_suits": missing_suits
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取定缺信息失败: {str(e)}")
+
+
+@router.post("/reset-missing-suits")
+async def reset_missing_suits():
+    """重置所有玩家的定缺"""
+    try:
+        current_state = game_service.get_game_state()
+        
+        # 重置所有玩家的定缺
+        for player_id, hand in current_state.get("player_hands", {}).items():
+            hand["missing_suit"] = None
+        
+        # 保存状态
+        success = game_service.set_game_state_dict(current_state)
+        
+        if success:
+            # 定缺已重置，前端可通过API获取
+            
+            return {
+                "success": True,
+                "message": "所有玩家定缺已重置",
+                "game_state": current_state
+            }
+        else:
+            return {
+                "success": False,
+                "message": "重置定缺失败"
+            }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"重置定缺失败: {str(e)}")
+
+
+# ============ 牌谱管理 API ============
+
+@router.get("/export-game-record")
+async def export_game_record():
+    """导出当前游戏牌谱"""
+    try:
+        # 获取当前游戏状态
+        current_state = game_service.get_game_state()
+        
+        # 构建牌谱数据
+        game_record = {
+            "game_info": {
+                "game_id": current_state.get("game_id", "unknown"),
+                "start_time": datetime.now().isoformat(),
+                "player_count": 4,
+                "game_mode": "xuezhan_daodi",  # 血战到底
+                "export_time": datetime.now().isoformat()
+            },
+            "players": {
+                "0": {"name": "我", "position": "我"},
+                "1": {"name": "下家", "position": "下家"},
+                "2": {"name": "对家", "position": "对家"},
+                "3": {"name": "上家", "position": "上家"}
+            },
+            "missing_suits": {},
+            "actions": current_state.get("actions_history", []),
+            "final_state": {
+                "player_hands": current_state.get("player_hands", {}),
+                "player_discarded_tiles": current_state.get("player_discarded_tiles", {}),
+                "discarded_tiles": current_state.get("discarded_tiles", [])
+            }
+        }
+        
+        # 添加定缺信息
+        for player_id in ["0", "1", "2", "3"]:
+            player_missing = game_service.get_player_missing_suit(int(player_id))
+            if player_missing:
+                game_record["missing_suits"][player_id] = player_missing
+        
+        # 添加统计信息
+        total_actions = len(game_record["actions"])
+        game_record["statistics"] = {
+            "total_actions": total_actions,
+            "action_types": {},
+            "players_hu_count": 0
+        }
+        
+        # 统计操作类型
+        for action in game_record["actions"]:
+            action_type = action.get("action_type", "unknown")
+            if action_type in game_record["statistics"]["action_types"]:
+                game_record["statistics"]["action_types"][action_type] += 1
+            else:
+                game_record["statistics"]["action_types"][action_type] = 1
+        
+        return {
+            "success": True,
+            "message": "牌谱导出成功",
+            "data": game_record
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"导出牌谱失败: {str(e)}")
+
+
+@router.post("/import-game-record")
+async def import_game_record(request: dict):
+    """导入游戏牌谱"""
+    try:
+        game_record = request.get("game_record")
+        if not game_record:
+            return {
+                "success": False,
+                "message": "请提供有效的牌谱数据"
+            }
+        
+        # 重置游戏状态
+        game_service.reset_game()
+        
+        # 导入定缺设置
+        missing_suits = game_record.get("missing_suits", {})
+        for player_id_str, missing_suit in missing_suits.items():
+            player_id = int(player_id_str)
+            game_service.set_player_missing_suit(player_id, missing_suit)
+        
+        # 导入最终状态
+        final_state = game_record.get("final_state", {})
+        if final_state:
+            # 设置玩家手牌
+            player_hands = final_state.get("player_hands", {})
+            for player_id_str, hand_data in player_hands.items():
+                game_service._game_state["player_hands"][player_id_str] = hand_data
+            
+            # 设置弃牌记录
+            player_discarded = final_state.get("player_discarded_tiles", {})
+            game_service._game_state["player_discarded_tiles"] = player_discarded
+            
+            # 设置公共弃牌
+            discarded_tiles = final_state.get("discarded_tiles", [])
+            game_service._game_state["discarded_tiles"] = discarded_tiles
+        
+        # 导入操作历史
+        actions = game_record.get("actions", [])
+        game_service._game_state["actions_history"] = actions
+        
+        # 保存状态
+        game_service._save_state()
+        
+        return {
+            "success": True,
+            "message": f"牌谱导入成功，共导入{len(actions)}个操作",
+            "game_state": game_service.get_game_state()
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"导入牌谱失败: {str(e)}")
+
+
+# ============ 游戏流程控制 API ============
+
+@router.post("/set-current-player")
+async def set_current_player(player_id: int):
+    """设置当前轮到操作的玩家"""
+    try:
+        if player_id < 0 or player_id > 3:
+            return {
+                "success": False,
+                "message": "玩家ID必须在0-3之间"
+            }
+        
+        # 获取当前游戏状态
+        current_state = game_service.get_game_state()
+        
+        # 设置当前玩家
+        current_state["current_player"] = player_id
+        
+        # 保存状态
+        success = game_service.set_game_state_dict(current_state)
+        
+        if success:
+            # 当前玩家已变更，前端可通过API获取
+            
+            player_names = {0: "我", 1: "下家", 2: "对家", 3: "上家"}
+            return {
+                "success": True,
+                "message": f"当前玩家已切换为: {player_names[player_id]}",
+                "current_player": player_id,
+                "game_state": current_state
+            }
+        else:
+            return {
+                "success": False,
+                "message": "设置当前玩家失败"
+            }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"设置当前玩家失败: {str(e)}")
+
+
+@router.post("/next-player")
+async def next_player():
+    """切换到下一个玩家"""
+    try:
+        # 获取当前游戏状态
+        current_state = game_service.get_game_state()
+        current_player = current_state.get("current_player", 0)
+        
+        # 切换到下一个玩家 (0->1->2->3->0)
+        next_player_id = (current_player + 1) % 4
+        
+        # 设置下一个玩家
+        current_state["current_player"] = next_player_id
+        
+        # 保存状态
+        success = game_service.set_game_state_dict(current_state)
+        
+        if success:
+            player_names = {0: "我", 1: "下家", 2: "对家", 3: "上家"}
+            return {
+                "success": True,
+                "message": f"轮到下一个玩家: {player_names[next_player_id]}",
+                "previous_player": current_player,
+                "current_player": next_player_id,
+                "game_state": current_state
+            }
+        else:
+            return {
+                "success": False,
+                "message": "切换玩家失败"
+            }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"切换玩家失败: {str(e)}")
+
+
+@router.post("/player-win")
+async def player_win(
+    player_id: int,
+    win_type: str,  # "zimo" 或 "dianpao"
+    win_tile_type: Optional[str] = None,
+    win_tile_value: Optional[int] = None,
+    dianpao_player_id: Optional[int] = None
+):
+    """玩家胡牌（自摸或点炮）"""
+    try:
+        current_state = game_service.get_game_state()
+        
+        # 设置玩家胜利状态
+        player_id_str = str(player_id)
+        if "player_hands" not in current_state:
+            current_state["player_hands"] = {}
+        if player_id_str not in current_state["player_hands"]:
+            current_state["player_hands"][player_id_str] = {
+                "tiles": None if player_id != 0 else [],
+                "tile_count": 0,
+                "melds": []
+            }
+        
+        current_state["player_hands"][player_id_str]["is_winner"] = True
+        current_state["player_hands"][player_id_str]["win_type"] = win_type
+        
+        # 设置胡牌信息
+        if win_tile_type and win_tile_value:
+            current_state["player_hands"][player_id_str]["win_tile"] = {
+                "type": win_tile_type,
+                "value": win_tile_value
+            }
+        
+        # 如果是点炮，设置点炮者信息
+        if win_type == "dianpao" and dianpao_player_id is not None:
+            current_state["player_hands"][player_id_str]["dianpao_player_id"] = dianpao_player_id
+        
+        # 更新游戏状态
+        game_service.set_game_state_dict(current_state)
+        
+        # 注意：胜利信息已保存到游戏状态中，前端可通过轮询获取
+        
+        player_names = {0: "我", 1: "下家", 2: "对家", 3: "上家"}
+        return {
+            "success": True,
+            "message": f"{player_names[player_id]}胜利标识设置成功",
+            "game_state": current_state
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"设置玩家胜利失败: {str(e)}")
+
+
+@router.post("/reveal-all-hands")
+async def reveal_all_hands():
+    """牌局结束后显示所有玩家手牌"""
+    try:
+        current_state = game_service.get_game_state()
+        
+        # 设置显示所有手牌的标志
+        current_state["show_all_hands"] = True
+        
+        # 更新游戏状态
+        game_service.set_game_state_dict(current_state)
+        
+        # 注意：show_all_hands标志已保存到游戏状态中，前端可通过API获取
+        
+        return {
+            "success": True,
+            "message": "已显示所有玩家手牌",
+            "game_state": current_state
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"显示所有手牌失败: {str(e)}")
+
+
+# ============ HTTP API 连接 ============
+# WebSocket 功能已移除，现在只使用 HTTP API

@@ -17,9 +17,14 @@ app.add_middleware(
 
 # 导入路由
 from .api import mahjong
+from .api.v1 import replay
 
 # 注册路由
 app.include_router(mahjong.router, prefix="/api/mahjong", tags=["mahjong"])
+app.include_router(replay.router, prefix="/api/v1/replay", tags=["replay"])
+
+# WebSocket路由 (通过前缀挂载)
+app.include_router(mahjong.router, prefix="/ws", tags=["websocket"])
 
 # 静态文件服务（如果需要）
 if os.path.exists("static"):

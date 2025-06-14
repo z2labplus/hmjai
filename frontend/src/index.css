@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 导入自定义动画样式 */
+@import './styles/animations.css';
+
 @layer base {
   html {
     font-family: 'PingFang SC', 'Microsoft YaHei', 'SimHei', sans-serif;

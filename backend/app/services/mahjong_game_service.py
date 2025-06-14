@@ -348,6 +348,54 @@ class MahjongGameService:
         else:
             print(f"⚠️ 牌库已空，无法为玩家{player_id}摸牌")
             return None
+
+    def _remove_tile_from_discard_pile(self, player_id: int, tile: Tile):
+        """从指定玩家的弃牌堆中移除指定的牌"""
+        try:
+            player_id_str = str(player_id)
+            
+            # 确保弃牌堆存在
+            if "player_discarded_tiles" not in self._game_state:
+                self._game_state["player_discarded_tiles"] = {}
+            
+            if player_id_str not in self._game_state["player_discarded_tiles"]:
+                self._game_state["player_discarded_tiles"][player_id_str] = []
+                return
+            
+            discarded_tiles = self._game_state["player_discarded_tiles"][player_id_str]
+            
+            # 从后往前查找最新弃出的相同牌（通常被碰/杠的是最后弃出的牌）
+            for i in range(len(discarded_tiles) - 1, -1, -1):
+                discarded_tile = discarded_tiles[i]
+                if (discarded_tile["type"] == tile.type and 
+                    discarded_tile["value"] == tile.value):
+                    # 找到匹配的牌，移除它
+                    removed_tile = discarded_tiles.pop(i)
+                    print(f"🗑️ 从玩家{player_id}弃牌堆移除: {removed_tile['value']}{removed_tile['type']}")
+                    break
+            else:
+                print(f"⚠️ 警告：在玩家{player_id}弃牌堆中未找到 {tile.value}{tile.type}")
+                return
+            
+            # 🔧 修复：同时从全局弃牌堆中移除被碰/杠的牌
+            if "discarded_tiles" not in self._game_state:
+                self._game_state["discarded_tiles"] = []
+            
+            # 从后往前查找并移除全局弃牌堆中的对应牌
+            global_discarded = self._game_state["discarded_tiles"]
+            for i in range(len(global_discarded) - 1, -1, -1):
+                global_tile = global_discarded[i]
+                if (global_tile["type"] == tile.type and 
+                    global_tile["value"] == tile.value):
+                    # 找到匹配的牌，移除它
+                    removed_global_tile = global_discarded.pop(i)
+                    print(f"🌍 从全局弃牌堆移除: {removed_global_tile['value']}{removed_global_tile['type']}")
+                    break
+            else:
+                print(f"⚠️ 警告：在全局弃牌堆中未找到 {tile.value}{tile.type}")
+            
+        except Exception as e:
+            print(f"❌ 从弃牌堆移除牌失败: {e}")
     
     def _handle_peng(self, request: TileOperationRequest) -> Tuple[bool, str]:
         """处理碰牌操作
@@ -375,17 +423,12 @@ class MahjongGameService:
                 if removed < 2:
                     return False, f"手牌中没有足够的{request.tile.value}{request.tile.type}进行碰牌"
                 
-                # 碰牌后自动出1张牌（模拟）
-                if self._game_state["player_hands"]["0"]["tiles"]:
-                    discarded_tile = self._game_state["player_hands"]["0"]["tiles"].pop(0)
-                    self._game_state["player_hands"]["0"]["tile_count"] = len(
-                        self._game_state["player_hands"]["0"]["tiles"]
-                    )
-                    print(f"🎯 我碰牌后自动出牌: {discarded_tile['value']}{discarded_tile['type']}")
+                # 注意：不在这里自动出牌，由外部调用弃牌API处理
+                print(f"🎯 我碰牌完成，手牌中移除了2张{request.tile.value}{request.tile.type}")
                 
             else:
-                # 其他玩家：只减少手牌数量3张
-                self._reduce_other_player_hand_count(player_id, 3)
+                # 其他玩家：只减少手牌数量2张（手中用掉的牌）
+                self._reduce_other_player_hand_count(player_id, 2)
             
             # 创建碰牌组（对所有人可见）
             meld = {
@@ -402,6 +445,10 @@ class MahjongGameService:
                 "original_peng_id": None,
                 "timestamp": datetime.now().timestamp()
             }
+            
+            # 从被碰玩家的弃牌堆中移除被碰的牌
+            if request.source_player_id is not None:
+                self._remove_tile_from_discard_pile(request.source_player_id, request.tile)
             
             # 添加到玩家的melds中
             self._game_state["player_hands"][player_id_str]["melds"].append(meld)
@@ -509,19 +556,14 @@ class MahjongGameService:
                 else:
                     self._reduce_other_player_hand_count(player_id, 3)
                 
+                # 从被杠玩家的弃牌堆中移除被杠的牌
+                if request.source_player_id is not None:
+                    self._remove_tile_from_discard_pile(request.source_player_id, request.tile)
+                
                 # 摸1张牌
                 self._auto_draw_tile_for_player(player_id)
                 
-                # 出1张牌（模拟）
-                if player_id == 0 and self._game_state["player_hands"]["0"]["tiles"]:
-                    discarded_tile = self._game_state["player_hands"]["0"]["tiles"].pop(0)
-                    self._game_state["player_hands"]["0"]["tile_count"] = len(
-                        self._game_state["player_hands"]["0"]["tiles"]
-                    )
-                    print(f"🎯 我直杠后自动出牌: {discarded_tile['value']}{discarded_tile['type']}")
-                elif player_id != 0:
-                    # 其他玩家出牌，只减少数量
-                    self._reduce_other_player_hand_count(player_id, 1)
+                # 注意：直杠后的出牌在外部API调用中单独处理，这里不自动出牌
             
             # 创建杠牌组
             meld = {
@@ -564,4 +606,100 @@ class MahjongGameService:
             
         except Exception as e:
             print(f"杠牌失败: {e}")
-            return False, f"杠牌失败: {str(e)}" 
+            return False, f"杠牌失败: {str(e)}"
+
+    # ============ 定缺相关方法 ============
+
+    def set_player_missing_suit(self, player_id: int, missing_suit: str) -> bool:
+        """设置玩家定缺花色"""
+        try:
+            player_id_str = str(player_id)
+            
+            # 验证花色
+            valid_suits = ["wan", "tiao", "tong"]
+            if missing_suit not in valid_suits:
+                print(f"❌ 无效的定缺花色: {missing_suit}")
+                return False
+            
+            # 确保玩家手牌结构存在
+            if player_id_str not in self._game_state["player_hands"]:
+                self._game_state["player_hands"][player_id_str] = {
+                    "tiles": [] if player_id == 0 else None,
+                    "tile_count": 0,
+                    "melds": [],
+                    "missing_suit": None
+                }
+            
+            # 设置定缺
+            self._game_state["player_hands"][player_id_str]["missing_suit"] = missing_suit
+            
+            # 记录操作历史
+            if "actions_history" not in self._game_state:
+                self._game_state["actions_history"] = []
+            
+            action = {
+                "player_id": player_id,
+                "action_type": "missing_suit",
+                "missing_suit": missing_suit,
+                "timestamp": datetime.now().timestamp()
+            }
+            self._game_state["actions_history"].append(action)
+            
+            print(f"✅ 玩家{player_id}定缺设置成功: {missing_suit}")
+            
+            # 保存状态
+            self._save_state()
+            return True
+            
+        except Exception as e:
+            print(f"设置定缺失败: {e}")
+            return False
+
+    def get_player_missing_suit(self, player_id: int) -> Optional[str]:
+        """获取玩家定缺花色"""
+        try:
+            player_id_str = str(player_id)
+            if player_id_str in self._game_state["player_hands"]:
+                return self._game_state["player_hands"][player_id_str].get("missing_suit")
+            return None
+        except Exception as e:
+            print(f"获取定缺失败: {e}")
+            return None
+
+    def get_all_missing_suits(self) -> Dict[str, Optional[str]]:
+        """获取所有玩家的定缺信息"""
+        missing_suits = {}
+        try:
+            for player_id_str, hand in self._game_state.get("player_hands", {}).items():
+                missing_suits[player_id_str] = hand.get("missing_suit")
+            return missing_suits
+        except Exception as e:
+            print(f"获取所有定缺信息失败: {e}")
+            return {}
+
+    def reset_all_missing_suits(self) -> bool:
+        """重置所有玩家的定缺"""
+        try:
+            for player_id_str, hand in self._game_state.get("player_hands", {}).items():
+                hand["missing_suit"] = None
+            
+            print("✅ 所有玩家定缺已重置")
+            
+            # 保存状态
+            self._save_state()
+            return True
+            
+        except Exception as e:
+            print(f"重置所有定缺失败: {e}")
+            return False
+
+    def is_tile_missing_suit(self, player_id: int, tile: Tile) -> bool:
+        """检查牌是否为玩家的定缺花色"""
+        try:
+            missing_suit = self.get_player_missing_suit(player_id)
+            if missing_suit is None:
+                return False
+            return tile.type == missing_suit
+        except Exception as e:
+            print(f"检查定缺失败: {e}")
+            return False 

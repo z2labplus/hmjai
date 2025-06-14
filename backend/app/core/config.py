@@ -2,6 +2,8 @@ from pydantic_settings import BaseSettings
 from typing import Optional
 
 class Settings(BaseSettings):
+    """应用配置"""
+    
     # Redis配置
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
@@ -17,5 +19,6 @@ class Settings(BaseSettings):
     
     class Config:
         env_file = ".env"
+        case_sensitive = True
 
 settings = Settings() 

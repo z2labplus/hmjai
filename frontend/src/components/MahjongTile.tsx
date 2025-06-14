@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import classNames from 'classnames';
 import { Tile, tileToString, TileType } from '../types/mahjong';
+import { getTileSvg, getBackSvg } from '../utils/mahjongUtils';
 
 export type CardBackStyle = 'classic' | 'elegant' | 'bamboo' | 'cloud' | 'traditional';
 
@@ -38,17 +39,25 @@ const MahjongTile: React.FC<MahjongTileProps> = ({
   
   // 尺寸样式
   const sizeClasses = {
-    tiny: 'w-6 h-8 text-xs',
-    small: 'w-8 h-10 text-xs',
-    medium: 'w-12 h-16 text-sm',
-    large: 'w-16 h-20 text-base'
+    tiny: 'w-6 h-8',
+    small: 'w-8 h-10',
+    medium: 'w-12 h-16',
+    large: 'w-16 h-20'
+  };
+  
+  // SVG尺寸样式
+  const svgSizeClasses = {
+    tiny: 'w-5 h-7',
+    small: 'w-7 h-9',
+    medium: 'w-10 h-14',
+    large: 'w-14 h-18'
   };
   
   // 获取背面样式
   const getBackVariantClasses = (style: CardBackStyle): string => {
     const backStyles = {
       classic: 'bg-gradient-to-br from-green-600 to-green-800 border-green-700',
-      elegant: 'bg-gradient-to-br from-gray-100 to-gray-200 border-gray-300',
+      elegant: 'bg-gradient-to-br from-blue-50 to-blue-100 border-blue-300', // 改为蓝色背景，更明显
       bamboo: 'bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200',
       cloud: 'bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200',
       traditional: 'bg-gradient-to-br from-red-900 to-red-950 border-red-800'
@@ -67,75 +76,7 @@ const MahjongTile: React.FC<MahjongTileProps> = ({
     back: getBackVariantClasses(cardBackStyle)
   };
   
-  // 花色颜色
-  const getTypeColor = (tileType: TileType): string => {
-    switch (tileType) {
-      case TileType.WAN:
-        return 'text-blue-600';
-      case TileType.TIAO:
-        return 'text-green-600';
-      case TileType.TONG:
-        return 'text-red-600';
-      case TileType.ZI:
-        return 'text-purple-600';
-      default:
-        return 'text-gray-600';
-    }
-  };
-  
-  // 获取背面图案
-  const getBackPattern = (style: CardBackStyle) => {
-    switch (style) {
-      case 'classic':
-        return (
-          <div className="relative z-10 flex flex-col items-center justify-center text-white">
-            <div className="text-xs opacity-90">🀄</div>
-            <div className="w-full h-0.5 bg-white/30 my-0.5"></div>
-            <div className="text-xs opacity-90">🀄</div>
-          </div>
-        );
-      case 'elegant':
-        return (
-          <div className="relative z-10 flex flex-col items-center justify-center">
-            {/* 纯色背景，不显示任何图案 */}
-          </div>
-        );
-      case 'bamboo':
-        return (
-          <div className="relative z-10 flex flex-col items-center justify-center text-emerald-600">
-            <div className="text-xs opacity-70">竹</div>
-            <div className="flex space-x-0.5 my-1">
-              <div className="w-0.5 h-3 bg-emerald-400/50"></div>
-              <div className="w-0.5 h-3 bg-emerald-400/50"></div>
-              <div className="w-0.5 h-3 bg-emerald-400/50"></div>
-            </div>
-            <div className="text-xs opacity-70">韵</div>
-          </div>
-        );
-      case 'cloud':
-        return (
-          <div className="relative z-10 flex flex-col items-center justify-center text-slate-500">
-            <div className="text-xs opacity-60">☁</div>
-            <div className="w-4 h-px bg-slate-300/60 my-1"></div>
-            <div className="text-xs opacity-60">☁</div>
-          </div>
-        );
-      case 'traditional':
-        return (
-          <div className="relative z-10 flex flex-col items-center justify-center text-yellow-200">
-            <div className="text-xs opacity-80">麻</div>
-            <div className="w-3 h-0.5 bg-yellow-200/40 my-0.5"></div>
-            <div className="text-xs opacity-80">将</div>
-          </div>
-        );
-      default:
-        return (
-          <div className="relative z-10 flex flex-col items-center justify-center">
-            {/* 纯色背景，不显示任何图案 */}
-          </div>
-        );
-    }
-  };
+
   
   // 根据方向和seamless属性生成边框和圆角样式
   const getSeamlessClasses = () => {
@@ -160,7 +101,6 @@ const MahjongTile: React.FC<MahjongTileProps> = ({
     seamless ? '' : 'shadow-sm hover:shadow-md',
     sizeClasses[size],
     variantClasses[variant],
-    variant === 'back' ? '' : getTypeColor(tile.type),
     {
       'active:scale-95': onClick && variant !== 'disabled' && variant !== 'back' && !seamless,
       'transform rotate-90': variant === 'selectedHorizontal' || variant === 'disabledHorizontal'
@@ -200,12 +140,47 @@ const MahjongTile: React.FC<MahjongTileProps> = ({
         <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent rounded-lg" />
       )}
       
-      {/* 背面图案 */}
-      {variant === 'back' ? getBackPattern(cardBackStyle) : (
-        /* 牌面文字 */
-        <span className="relative z-10 font-black">
-          {tileText}
-        </span>
+      {/* SVG显示或背面图案 */}
+      {variant === 'back' ? (
+        <div className="w-full h-full flex items-center justify-center">
+          <img
+            src={getBackSvg()}
+            alt="麻将牌背面"
+            className={classNames(svgSizeClasses[size], 'object-contain')}
+            onError={(e) => {
+              // 如果SVG加载失败，显示备用的背面样式
+              console.warn('背面SVG加载失败，使用备用样式');
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+              const parent = target.parentElement;
+              if (parent) {
+                parent.innerHTML = `
+                  <div class="w-full h-full bg-gradient-to-br from-blue-600 to-blue-800 rounded flex items-center justify-center text-white font-bold text-xs">
+                    麻
+                  </div>
+                `;
+              }
+            }}
+          />
+        </div>
+      ) : (
+        <img
+          src={getTileSvg(tile)}
+          alt={tileText}
+          className={classNames(svgSizeClasses[size], 'object-contain')}
+          onError={(e) => {
+            // 如果牌面SVG加载失败，显示文字作为备用
+            console.warn(`牌面SVG加载失败: ${tileText}，使用文字显示`);
+            const target = e.target as HTMLImageElement;
+            target.style.display = 'none';
+            const parent = target.parentElement;
+            if (parent) {
+              parent.innerHTML = `
+                <span class="text-xs font-bold">${tileText}</span>
+              `;
+            }
+          }}
+        />
       )}
       
       {/* 剩余数量显示 - 只有当数量大于0且不是背面时显示 */}
