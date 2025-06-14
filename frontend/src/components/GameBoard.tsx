@@ -1,11 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { useGameStore, selectMyHand, selectDiscardedTiles } from '../stores/gameStore';
+import { useWebSocketGameStore } from '../stores/webSocketGameStore';
 import { Tile, TileType, createTile, tileToString, tilesEqual, Meld, MeldType, GangType, calculateRemainingTilesByType } from '../types/mahjong';
 import MahjongTile from './MahjongTile';
 import MahjongTable from './MahjongTable';
 import { CardBackStyle } from './MahjongTile';
-import MahjongApiClient from '../services/MahjongApiClient';
 import MissingSuitControl from './MissingSuitControl';
 
 interface GameBoardProps {
@@ -14,20 +13,30 @@ interface GameBoardProps {
 }
 
 const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elegant' }) => {
-  const myHand = useGameStore(selectMyHand());
-  const discardedTiles = useGameStore(selectDiscardedTiles());
-  const gameState = useGameStore(state => state.gameState);
   const { 
-    addTileToHand, 
-    removeTileFromHand, 
-    addDiscardedTile, 
-    addMeld, 
+    gameState,
+    isConnected,
+    lastSyncTime,
+    addTileToHand,
+    discardTile,
+    pengTile,
+    gangTile,
+    setMissingSuit,
+    nextPlayer,
+    resetGame,
+    syncGameStateFromWS,
+    // 本地操作方法（用于兼容）
+    addTileToHandLocal,
+    removeTileFromHand,
+    addDiscardedTile,
+    addMeld,
     reduceHandTilesCount,
-    syncFromBackend,
-    syncToBackend,
-    isApiConnected,
-    lastSyncTime
-  } = useGameStore();
+    setPlayerMissingSuit
+  } = useWebSocketGameStore();
+  
+  // 从游戏状态中获取我的手牌和弃牌
+  const myHand = gameState.player_hands['0']?.tiles || [];
+  const discardedTiles = gameState.discarded_tiles || [];
   
   const [selectedTiles, setSelectedTiles] = useState<Tile[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState<number>(0); // 默认选择上家（显示索引0）
@@ -63,7 +72,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
   useEffect(() => {
     if (autoSync) {
       autoSyncTimer.current = setInterval(() => {
-        syncFromBackend();
+        syncGameStateFromWS();
       }, 500);
     } else if (autoSyncTimer.current) {
       clearInterval(autoSyncTimer.current);
@@ -76,7 +85,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
         autoSyncTimer.current = null;
       }
     };
-  }, [autoSync, syncFromBackend]);
+  }, [autoSync, syncGameStateFromWS]);
   
   // 所有可选的牌
   const availableTiles: Tile[] = [];
@@ -107,122 +116,43 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
     const actualPlayerId = displayOrder[selectedPlayer]; // 转换显示索引为实际Player ID
     
     try {
-    if (operationType === 'hand') {
-      // 为当前选中的玩家添加手牌
-        await MahjongApiClient.addTileToHand(actualPlayerId, tile);
-    } else if (operationType === 'discard') {
-        // 调用API添加弃牌
-        const response = await MahjongApiClient.discardTile(actualPlayerId, tile.type, tile.value);
-        if (response.success) {
-          // API调用成功后，更新前端状态
-      addDiscardedTile(tile, actualPlayerId);
-          // 获取最新的游戏状态
-          const gameState = await MahjongApiClient.getGameState();
-          if (gameState.success) {
-            useGameStore.setState({ gameState: gameState.data });
-          }
+      if (operationType === 'hand') {
+        // 为当前选中的玩家添加手牌 - 使用WebSocket方法
+        await addTileToHand(actualPlayerId, tile);
+        console.log(`✅ 玩家${actualPlayerId}添加手牌成功: ${tile.value}${tile.type}`);
+      } else if (operationType === 'discard') {
+        // 弃牌 - 使用WebSocket方法
+        await discardTile(actualPlayerId, tile);
+        console.log(`✅ 玩家${actualPlayerId}弃牌成功: ${tile.value}${tile.type}`);
+      } else if (operationType === 'peng') {
+        // 碰牌 - 使用WebSocket方法
+        const sourcePlayerId = selectedSourcePlayer !== null ? displayOrder[selectedSourcePlayer] : undefined;
+        await pengTile(actualPlayerId, tile, sourcePlayerId);
+        console.log(`✅ 玩家${actualPlayerId}碰牌成功: ${tile.value}${tile.type}`);
+      } else if (operationType === 'angang') {
+        // 暗杠 - 使用WebSocket方法
+        await gangTile(actualPlayerId, tile, 'angang');
+        console.log(`✅ 玩家${actualPlayerId}暗杠成功: ${tile.value}${tile.type}`);
+      } else if (operationType === 'zhigang') {
+        // 直杠 - 使用WebSocket方法
+        const sourcePlayerId = selectedSourcePlayer !== null ? displayOrder[selectedSourcePlayer] : undefined;
+        await gangTile(actualPlayerId, tile, 'zhigang', sourcePlayerId);
+        console.log(`✅ 玩家${actualPlayerId}直杠成功: ${tile.value}${tile.type}`);
+      } else if (operationType === 'jiagang') {
+        // 加杠 - 使用WebSocket方法
+        await gangTile(actualPlayerId, tile, 'jiagang');
+        console.log(`✅ 玩家${actualPlayerId}加杠成功: ${tile.value}${tile.type}`);
+      } else if (operationType === 'missing') {
+        // 定缺操作：只能设置万、条、筒
+        if (['wan', 'tiao', 'tong'].includes(tile.type)) {
+          await setMissingSuit(actualPlayerId, tile.type);
+          console.log(`✅ 玩家${actualPlayerId}定缺设置成功: ${tile.type}`);
+        } else {
+          console.warn('❌ 定缺只能选择万、条、筒');
         }
-    } else if (operationType === 'peng') {
-      // 碰牌：创建碰牌组并添加到melds
-      const meld: Meld = {
-        type: MeldType.PENG,
-        tiles: [tile, tile, tile],
-        exposed: true,
-        source_player: selectedSourcePlayer !== null ? displayOrder[selectedSourcePlayer] : undefined
-      };
-      addMeld(actualPlayerId, meld);
-      
-      // 碰牌后自动减少手牌
-      if (actualPlayerId === 0) {
-        // "我" 碰牌：减少2张手牌（第3张是从别人那里碰来的，我知道自己的手牌）
-        removeTileFromHand(actualPlayerId, tile);
-        removeTileFromHand(actualPlayerId, tile);
-      } else {
-        // 其他玩家碰牌：直接减少3张手牌（模拟真实场景）
-        reduceHandTilesCount(actualPlayerId, 3, tile);
-      }       
-    } else if (operationType === 'angang') {
-      // 暗杠：创建暗杠组并添加到melds
-      const meld: Meld = {
-        type: MeldType.GANG,
-        tiles: [tile, tile, tile, tile],
-        exposed: false,
-        gang_type: GangType.AN_GANG
-      };
-      addMeld(actualPlayerId, meld);
-      
-      // 暗杠后自动减少手牌
-      if (actualPlayerId === 0) {
-        // "我" 暗杠：减少4张手牌（我知道自己的手牌）
-        removeTileFromHand(actualPlayerId, tile);
-        removeTileFromHand(actualPlayerId, tile);
-        removeTileFromHand(actualPlayerId, tile);
-        removeTileFromHand(actualPlayerId, tile);
-      } else {
-        // 其他玩家暗杠：直接减少4张手牌（模拟真实场景）
-        reduceHandTilesCount(actualPlayerId, 4, tile);
-      }
-    } else if (operationType === 'zhigang') {
-      // 直杠：创建明杠组并添加到melds
-      const meld: Meld = {
-        type: MeldType.GANG,
-        tiles: [tile, tile, tile, tile],
-        exposed: true,
-        gang_type: GangType.MING_GANG,
-        source_player: selectedSourcePlayer !== null ? displayOrder[selectedSourcePlayer] : undefined
-      };
-      addMeld(actualPlayerId, meld);
-      
-      // 直杠后自动减少手牌
-      if (actualPlayerId === 0) {
-        // "我" 直杠：减少3张手牌（第4张是从别人那里杠来的，我知道自己的手牌）
-        removeTileFromHand(actualPlayerId, tile);
-        removeTileFromHand(actualPlayerId, tile);
-        removeTileFromHand(actualPlayerId, tile);
-      } else {
-        // 其他玩家直杠：直接减少4张手牌（模拟真实场景）
-        reduceHandTilesCount(actualPlayerId, 4, tile);
-      }
-    } else if (operationType === 'jiagang') {
-      // 加杠：创建明杠组并添加到melds
-      const meld: Meld = {
-        type: MeldType.GANG,
-        tiles: [tile, tile, tile, tile],
-        exposed: true,
-        gang_type: GangType.JIA_GANG  // 使用JIA_GANG类型
-      };
-      addMeld(actualPlayerId, meld);
-      
-      // 加杠后自动减少手牌
-      if (actualPlayerId === 0) {
-        // "我" 加杠：减少1张手牌（在已有碰牌基础上加杠，我知道自己的手牌）
-        removeTileFromHand(actualPlayerId, tile);
-      } else {
-        // 其他玩家加杠：直接减少1张手牌（模拟真实场景）
-        reduceHandTilesCount(actualPlayerId, 1, tile);
-      }
-    } else if (operationType === 'missing') {
-      // 定缺操作：只能设置万、条、筒
-      if (['wan', 'tiao', 'tong'].includes(tile.type)) {
-        try {
-          const response = await MahjongApiClient.setMissingSuit(actualPlayerId, tile.type as 'wan' | 'tiao' | 'tong');
-          if (response.success) {
-            // 更新本地状态
-            useGameStore.getState().setPlayerMissingSuit(actualPlayerId, tile.type as 'wan' | 'tiao' | 'tong');
-            console.log(`✅ 玩家${actualPlayerId}定缺设置成功: ${tile.type}`);
-          } else {
-            console.error('❌ 定缺设置失败:', response.message);
-          }
-        } catch (error) {
-          console.error('❌ 定缺API调用失败:', error);
-        }
-      } else {
-        console.warn('❌ 定缺只能选择万、条、筒');
-      }
       }
     } catch (error) {
       console.error('操作失败:', error);
-      // 可以在这里添加错误提示
     }
   };
   
@@ -244,9 +174,14 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
     setSelectedTiles([]);
   };
   
-  const handleClearHand = () => {
-    useGameStore.getState().resetGame();
-    setSelectedTiles([]);
+  const handleClearHand = async () => {
+    try {
+      await resetGame();
+      setSelectedTiles([]);
+      console.log('✅ 游戏重置成功');
+    } catch (error) {
+      console.error('❌ 重置游戏失败:', error);
+    }
   };
 
   // 处理操作类型改变
@@ -315,11 +250,11 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
                 </span>
                 <button
                   onClick={async () => {
-                    const result = await useGameStore.getState().nextPlayer();
-                    if (result.success) {
-                      console.log('✅ 切换到下一个玩家:', result.message);
-                    } else {
-                      console.error('❌ 切换玩家失败:', result.message);
+                    try {
+                      await nextPlayer();
+                      console.log('✅ 切换到下一个玩家');
+                    } catch (error) {
+                      console.error('❌ 切换玩家失败:', error);
                     }
                   }}
                   className="px-2 py-1 bg-orange-200 hover:bg-orange-300 text-orange-800 rounded-md text-xs font-medium transition-colors"
@@ -524,40 +459,34 @@ const GameBoard: React.FC<GameBoardProps> = ({ className, cardBackStyle = 'elega
         <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <h3 className="text-sm font-semibold text-gray-700">API同步状态</h3>
+              <h3 className="text-sm font-semibold text-gray-700">WebSocket连接状态</h3>
               <div className={`flex items-center gap-2 px-2 py-1 rounded-full text-xs ${
-                isApiConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
               }`}>
                 <div className={`w-2 h-2 rounded-full ${
-                  isApiConnected ? 'bg-green-500' : 'bg-red-500'
+                  isConnected ? 'bg-green-500' : 'bg-red-500'
                 }`}></div>
-                {isApiConnected ? '已连接' : '未连接'}
+                {isConnected ? 'WebSocket已连接' : 'WebSocket未连接'}
               </div>
               {lastSyncTime && (
                 <span className="text-xs text-gray-500">
-                  最后同步: {lastSyncTime.toLocaleTimeString()}
+                  最后更新: {lastSyncTime.toLocaleTimeString()}
                 </span>
               )}
             </div>
             
             <div className="flex gap-2">
               <button
-                onClick={syncFromBackend}
+                onClick={syncGameStateFromWS}
                 className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
               >
-                ⬇️ 从后端同步
-              </button>
-              <button
-                onClick={syncToBackend}
-                className="px-3 py-1.5 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors"
-              >
-                ⬆️ 同步到后端
+                🔄 同步游戏状态
               </button>
               <button
                 onClick={() => setAutoSync(prev => !prev)}
                 className={`px-3 py-1.5 text-xs font-medium ${autoSync ? 'text-red-600 bg-red-50 border-red-200 hover:bg-red-100' : 'text-purple-600 bg-purple-50 border-purple-200 hover:bg-purple-100'} rounded-md border transition-colors`}
               >
-                {autoSync ? '停止自动同步' : '自动同步后端'}
+                {autoSync ? '停止自动同步' : '启用自动同步'}
               </button>
             </div>
           </div>

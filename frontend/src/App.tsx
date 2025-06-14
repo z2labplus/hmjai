@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import GameBoard from './components/GameBoard';
 import AnalysisPanel from './components/AnalysisPanel';
 import SettingsPanel from './components/SettingsPanel';
-import { useGameStore } from './stores/gameStore';
+import { useWebSocketGameStore } from './stores/webSocketGameStore';
 import { useSettings } from './hooks/useSettings';
 
 import { MahjongAPI } from './utils/api';
@@ -25,7 +25,16 @@ const suitNames = {
 };
 
 function App() {
-  const { setAvailableTiles, checkApiConnection, setGameState, syncFromBackend, checkForWinners } = useGameStore();
+  const { 
+    initWebSocket, 
+    connect, 
+    isConnected, 
+    connectionStatus, 
+    setAvailableTiles, 
+    gameState,
+    checkForWinners,
+    lastError
+  } = useWebSocketGameStore();
   const { settings } = useSettings();
   const [showSettings, setShowSettings] = useState(false);
   
@@ -35,36 +44,40 @@ function App() {
   const [lastWinnerCheck, setLastWinnerCheck] = useState<string>('');
 
   useEffect(() => {
-    // 初始化时获取麻将牌信息
+    // 初始化WebSocket连接
     const initializeApp = async () => {
       try {
-        // 检查API连接状态
-        const isConnected = await checkApiConnection();
-        console.log(`🔗 API连接状态: ${isConnected ? '已连接' : '未连接'}`);
+        console.log('🔗 初始化WebSocket连接...');
         
-        if (isConnected) {
+        // 初始化WebSocket客户端
+        await initWebSocket('ws://localhost:8000/api/ws', 'default');
+        
+        // 连接到WebSocket服务器
+        await connect();
+        
+        console.log('✅ WebSocket连接成功');
+        
+        // 获取麻将牌信息（如果需要的话）
+        try {
           const tiles = await MahjongAPI.getTileCodes();
           setAvailableTiles(tiles);
-        } else {
-          console.warn('⚠️ 后端服务未连接，部分功能可能不可用');
+        } catch (error) {
+          console.warn('⚠️ 获取麻将牌信息失败，使用默认配置');
         }
       } catch (error) {
-        console.error('❌ 初始化应用失败:', error);
+        console.error('❌ 初始化WebSocket连接失败:', error);
       }
     };
 
     initializeApp();
-  }, [setAvailableTiles, checkApiConnection]);
+  }, [initWebSocket, connect, setAvailableTiles]);
 
-  // 轮询检查胜利状态
+  // 检查胜利状态
   useEffect(() => {
-    const checkWinners = async () => {
+    const checkWinnersFromState = () => {
       try {
-        // 先同步游戏状态
-        await syncFromBackend();
-        
-        // 检查胜利者
-        const winners = await checkForWinners();
+        // 直接从当前游戏状态检查胜利者
+        const winners = checkForWinners();
         
         if (winners.length > 0) {
           // 生成胜利者标识字符串
@@ -84,10 +97,10 @@ function App() {
     };
 
     // 每2秒检查一次胜利状态
-    const interval = setInterval(checkWinners, 2000);
+    const interval = setInterval(checkWinnersFromState, 2000);
     
     return () => clearInterval(interval);
-  }, [syncFromBackend, checkForWinners, lastWinnerCheck]);
+  }, [checkForWinners, lastWinnerCheck]);
 
   // 处理玩家胜利消息
   useEffect(() => {
@@ -139,8 +152,8 @@ function App() {
               className="flex items-center gap-3"
             >
               <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span>在线服务</span>
+                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+                <span>{isConnected ? 'WebSocket已连接' : 'WebSocket未连接'}</span>
               </div>
               
               <button 
