@@ -221,8 +221,8 @@ const ReplaySystem: React.FC = () => {
         break;
     }
 
-    // 更新当前玩家（简单轮转）
-    newState.current_player = (action.player_id + 1) % 4;
+    // 当前玩家就是执行操作的玩家
+    newState.current_player = action.player_id;
 
     return newState;
   }, [parseCardString]);
