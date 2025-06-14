@@ -156,6 +156,18 @@ class RedisService:
         except Exception as e:
             logger.error(f"Redis哈希获取所有值失败: {e}")
             return {}
+    
+    def keys(self, pattern: str) -> list:
+        """获取匹配模式的键列表"""
+        if not self.is_connected():
+            logger.warning("Redis未连接，无法获取键列表")
+            return []
+        
+        try:
+            return self.redis_client.keys(pattern)
+        except Exception as e:
+            logger.error(f"Redis获取键列表失败: {e}")
+            return []
 
 # 创建全局Redis服务实例
 redis_service = RedisService() 

@@ -227,12 +227,12 @@ class ReplayService:
     ) -> List[GameRecord]:
         """获取玩家游戏历史"""
         # 从Redis搜索该玩家的游戏记录
-        game_keys = await self.redis.client.keys("game_record:*")
         player_games = []
         
+        game_keys = self.redis.keys("game_record:*") 
         for key in game_keys:
             try:
-                game_data = await self.redis.client.get(key)
+                game_data = self.redis.get(key)
                 if game_data:
                     game_record = GameRecord.parse_raw(game_data)
                     # 检查是否包含该玩家
@@ -264,16 +264,16 @@ class ReplayService:
     async def _save_game_record(self, game_record: GameRecord):
         """保存游戏记录到Redis"""
         key = f"game_record:{game_record.game_id}"
-        await self.redis.client.set(
+        self.redis.set(
             key, 
             game_record.json(ensure_ascii=False),
-            ex=7*24*3600  # 7天过期
+            expire=7*24*3600  # 7天过期
         )
     
     async def _load_game_record(self, game_id: str) -> Optional[GameRecord]:
         """从Redis加载游戏记录"""
         key = f"game_record:{game_id}"
-        data = await self.redis.client.get(key)
+        data = self.redis.get(key)
         if data:
             try:
                 return GameRecord.parse_raw(data)

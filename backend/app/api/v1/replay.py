@@ -106,12 +106,12 @@ async def list_recent_games(
     """获取最近的游戏记录列表"""
     try:
         # 从Redis获取所有游戏记录的键
-        game_keys = await replay_service.redis.client.keys("game_record:*")
+        game_keys = replay_service.redis.keys("game_record:*")
         recent_games = []
         
         for key in game_keys[-limit:]:  # 获取最近的记录
             try:
-                game_data = await replay_service.redis.client.get(key)
+                game_data = replay_service.redis.get(key)
                 if game_data:
                     game_record = GameRecord.parse_raw(game_data)
                     # 只返回基本信息，不包含详细操作
@@ -163,10 +163,10 @@ async def create_share_link(
             "share_count": 0
         }
         
-        await replay_service.redis.client.set(
+        replay_service.redis.set(
             share_key,
-            str(share_data),
-            ex=30*24*3600  # 30天过期
+            share_data,
+            expire=30*24*3600  # 30天过期
         )
         
         return ApiResponse(
@@ -196,11 +196,11 @@ async def delete_game_replay(
         
         # 删除Redis中的记录
         key = f"game_record:{game_id}"
-        await replay_service.redis.client.delete(key)
+        replay_service.redis.delete(key)
         
         # 删除分享记录
         share_key = f"share:{game_id}"
-        await replay_service.redis.client.delete(share_key)
+        replay_service.redis.delete(share_key)
         
         return ApiResponse(
             success=True,

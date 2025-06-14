@@ -140,7 +140,7 @@ const ReplaySystem: React.FC = () => {
           // 从手牌移除
           if (action.player_id === 0 && newState.player_hands[playerIdStr].tiles) {
             const tiles = newState.player_hands[playerIdStr].tiles!;
-            const index = tiles.findIndex(t => t.type === actionTile.type && t.value === actionTile.value);
+            const index = tiles.findIndex((t: Tile) => t.type === actionTile.type && t.value === actionTile.value);
             if (index !== -1) {
               tiles.splice(index, 1);
             }
@@ -166,7 +166,7 @@ const ReplaySystem: React.FC = () => {
             // 玩家0减少2张（第3张是碰来的）
             const tiles = newState.player_hands[playerIdStr].tiles!;
             for (let i = 0; i < 2; i++) {
-              const index = tiles.findIndex(t => t.type === actionTile.type && t.value === actionTile.value);
+              const index = tiles.findIndex((t: Tile) => t.type === actionTile.type && t.value === actionTile.value);
               if (index !== -1) tiles.splice(index, 1);
             }
           } else {
@@ -195,7 +195,7 @@ const ReplaySystem: React.FC = () => {
           if (action.player_id === 0) {
             const tiles = newState.player_hands[playerIdStr].tiles!;
             for (let i = 0; i < reduceCount; i++) {
-              const index = tiles.findIndex(t => t.type === actionTile.type && t.value === actionTile.value);
+              const index = tiles.findIndex((t: Tile) => t.type === actionTile.type && t.value === actionTile.value);
               if (index !== -1) tiles.splice(index, 1);
             }
           } else {
