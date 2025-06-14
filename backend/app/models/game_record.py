@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Union
 from datetime import datetime
 from enum import Enum
@@ -46,7 +46,7 @@ class GameAction(BaseModel):
     is_success: bool = Field(True, description="操作是否成功")
     score_change: int = Field(0, description="分数变化")
     
-    class Config:
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "sequence": 1,
@@ -57,6 +57,7 @@ class GameAction(BaseModel):
                 "score_change": 0
             }
         }
+    )
 
 class PlayerGameRecord(BaseModel):
     """玩家游戏记录"""
@@ -104,7 +105,7 @@ class GameRecord(BaseModel):
     total_actions: int = Field(0, description="总操作数")
     winner_count: int = Field(0, description="胡牌人数")
     
-    class Config:
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "game_id": "game_123456",
@@ -116,6 +117,7 @@ class GameRecord(BaseModel):
                 "winner_count": 0
             }
         }
+    )
 
 class GameReplay(BaseModel):
     """牌谱回放数据"""

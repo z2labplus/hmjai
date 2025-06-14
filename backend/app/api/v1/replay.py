@@ -113,7 +113,7 @@ async def list_recent_games(
             try:
                 game_data = replay_service.redis.get(key)
                 if game_data:
-                    game_record = GameRecord.parse_raw(game_data)
+                    game_record = GameRecord.model_validate_json(game_data)
                     # 只返回基本信息，不包含详细操作
                     summary = {
                         "game_id": game_record.game_id,

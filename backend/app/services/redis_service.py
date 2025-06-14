@@ -49,8 +49,12 @@ class RedisService:
             return False
         
         try:
+            # 如果是字典或列表，转换为JSON字符串
             if isinstance(value, (dict, list)):
-                value = json.dumps(value)
+                value = json.dumps(value, ensure_ascii=False)
+            # 如果已经是字符串，直接使用
+            elif not isinstance(value, str):
+                value = str(value)
             
             result = self.redis_client.set(key, value, ex=expire)
             return bool(result)
@@ -69,11 +73,9 @@ class RedisService:
             if value is None:
                 return None
             
-            # 尝试解析JSON
-            try:
-                return json.loads(value)
-            except json.JSONDecodeError:
-                return value
+            # 直接返回字符串，不进行JSON解析
+            # 让调用方决定是否解析JSON
+            return value
         except Exception as e:
             logger.error(f"Redis获取失败: {e}")
             return None

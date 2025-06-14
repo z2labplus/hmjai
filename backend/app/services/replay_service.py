@@ -234,7 +234,7 @@ class ReplayService:
             try:
                 game_data = self.redis.get(key)
                 if game_data:
-                    game_record = GameRecord.parse_raw(game_data)
+                    game_record = GameRecord.model_validate_json(game_data)
                     # 检查是否包含该玩家
                     if any(p.player_name == player_name for p in game_record.players):
                         player_games.append(game_record)
@@ -264,9 +264,11 @@ class ReplayService:
     async def _save_game_record(self, game_record: GameRecord):
         """保存游戏记录到Redis"""
         key = f"game_record:{game_record.game_id}"
+        # 使用model_dump_json替代json方法
+        json_data = game_record.model_dump_json(indent=None)
         self.redis.set(
             key, 
-            game_record.json(ensure_ascii=False),
+            json_data,
             expire=7*24*3600  # 7天过期
         )
     
@@ -276,7 +278,8 @@ class ReplayService:
         data = self.redis.get(key)
         if data:
             try:
-                return GameRecord.parse_raw(data)
+                # 使用model_validate_json替代parse_raw
+                return GameRecord.model_validate_json(data)
             except:
                 return None
         return None
