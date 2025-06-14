@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import GameBoard from './components/GameBoard';
 import AnalysisPanel from './components/AnalysisPanel';
 import SettingsPanel from './components/SettingsPanel';
+import ReplaySystem from './components/ReplaySystem';
 import { useWebSocketGameStore } from './stores/webSocketGameStore';
 import { useSettings } from './hooks/useSettings';
 
@@ -37,6 +38,7 @@ function App() {
   } = useWebSocketGameStore();
   const { settings } = useSettings();
   const [showSettings, setShowSettings] = useState(false);
+  const [currentMode, setCurrentMode] = useState<'live' | 'replay'>('live');
   
   // 胜利通知显示状态
   const [showWinNotification, setShowWinNotification] = useState(false);
@@ -44,7 +46,9 @@ function App() {
   const [lastWinnerCheck, setLastWinnerCheck] = useState<string>('');
 
   useEffect(() => {
-    // 初始化WebSocket连接
+    // 只在实时游戏模式下初始化WebSocket连接
+    if (currentMode !== 'live') return;
+    
     const initializeApp = async () => {
       try {
         console.log('🔗 初始化WebSocket连接...');
@@ -70,10 +74,12 @@ function App() {
     };
 
     initializeApp();
-  }, [initWebSocket, connect, setAvailableTiles]);
+  }, [currentMode, initWebSocket, connect, setAvailableTiles]);
 
-  // 检查胜利状态
+  // 检查胜利状态 - 只在实时游戏模式下进行
   useEffect(() => {
+    if (currentMode !== 'live') return;
+    
     const checkWinnersFromState = () => {
       try {
         // 直接从当前游戏状态检查胜利者
@@ -100,7 +106,7 @@ function App() {
     const interval = setInterval(checkWinnersFromState, 2000);
     
     return () => clearInterval(interval);
-  }, [checkForWinners, lastWinnerCheck]);
+  }, [currentMode, checkForWinners, lastWinnerCheck]);
 
   // 处理玩家胜利消息
   useEffect(() => {
@@ -151,10 +157,36 @@ function App() {
               animate={{ opacity: 1, x: 0 }}
               className="flex items-center gap-3"
             >
-              <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600">
-                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-                <span>{isConnected ? 'WebSocket已连接' : 'WebSocket未连接'}</span>
+              {/* 模式切换 */}
+              <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setCurrentMode('live')}
+                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                    currentMode === 'live'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  🎮 实时游戏
+                </button>
+                <button
+                  onClick={() => setCurrentMode('replay')}
+                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                    currentMode === 'replay'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  🎬 牌谱回放
+                </button>
               </div>
+
+              {currentMode === 'live' && (
+                <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600">
+                  <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+                  <span>{isConnected ? 'WebSocket已连接' : 'WebSocket未连接'}</span>
+                </div>
+              )}
               
               <button 
                 onClick={() => setShowSettings(true)}
@@ -173,27 +205,39 @@ function App() {
 
       {/* 主内容区 */}
       <main className="flex-1 flex overflow-hidden">
-        <div className="w-full h-full flex">
-          {/* 左侧：游戏面板 - 占用更多空间 */}
+        {currentMode === 'live' ? (
+          <div className="w-full h-full flex">
+            {/* 左侧：游戏面板 - 占用更多空间 */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="flex-1 min-w-0 p-4"
+            >
+              <GameBoard className="h-full w-full" cardBackStyle={settings.cardBackStyle} />
+            </motion.div>
+
+            {/* 右侧：分析面板 - 固定宽度 */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="w-80 flex-shrink-0 p-4 pr-6"
+            >
+              <AnalysisPanel className="h-full" />
+            </motion.div>
+          </div>
+        ) : (
+          /* 回放模式 - 全屏显示 */
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="flex-1 min-w-0 p-4"
+            className="w-full h-full"
           >
-            <GameBoard className="h-full w-full" cardBackStyle={settings.cardBackStyle} />
+            <ReplaySystem />
           </motion.div>
-
-          {/* 右侧：分析面板 - 固定宽度 */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="w-80 flex-shrink-0 p-4 pr-6"
-          >
-            <AnalysisPanel className="h-full" />
-          </motion.div>
-        </div>
+        )}
       </main>
 
       {/* 底部信息 - 更紧凑 */}
