@@ -7,7 +7,7 @@ interface MissingSuitControlProps {
 
 const MissingSuitControl: React.FC<MissingSuitControlProps> = ({ className }) => {
   const gameState = useWebSocketGameStore(state => state.gameState);
-  const { setPlayerMissingSuit, setMissingSuit, resetMissingSuits } = useWebSocketGameStore();
+  const { setPlayerMissingSuit, setMissingSuit, resetMissingSuits, getMissingSuits } = useWebSocketGameStore();
   const [isLoading, setIsLoading] = useState(false);
 
   const playerNames = ['0我', '1下家', '2对家', '3上家'];
