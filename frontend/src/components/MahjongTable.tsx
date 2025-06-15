@@ -109,39 +109,33 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
     return melds.reduce((total, meld) => total + (meld.tiles?.length || 0), 0);
   };
   
-  // 计算玩家区域需要的宽度
-  const calculatePlayerAreaWidth = () => {
-    // 获取所有玩家的手牌数量
-    const playerHandCounts = [
-      player0Hand.tile_count || (player0Hand.tiles?.length || 0),
-      player1Hand.tile_count || (player1Hand.tiles?.length || 0),
-      player2Hand.tile_count || (player2Hand.tiles?.length || 0),
-      player3Hand.tile_count || (player3Hand.tiles?.length || 0)
-    ];
+  // 计算单个玩家区域需要的宽度
+  const calculatePlayerAreaWidth = (playerId: number) => {
+    const hand = [player0Hand, player1Hand, player2Hand, player3Hand][playerId];
+    const handCount = hand.tile_count || (hand.tiles?.length || 0);
+    const meldCount = calculateMeldTilesCount(hand.melds);
+    const totalTileCount = handCount + meldCount;
     
-    // 获取所有玩家的碰杠牌数量
-    const playerMeldCounts = [
-      calculateMeldTilesCount(player0Hand.melds),
-      calculateMeldTilesCount(player1Hand.melds),
-      calculateMeldTilesCount(player2Hand.melds),
-      calculateMeldTilesCount(player3Hand.melds)
-    ];
+    // 确保牌数在13-25之间（允许更多手牌）
+    const clampedTileCount = Math.min(Math.max(totalTileCount, 13), 25);
     
-    // 计算每个玩家的总牌数（手牌 + 碰杠牌）
-    const totalTileCounts = playerHandCounts.map((handCount, index) => handCount + playerMeldCounts[index]);
-    
-    // 找出最大的牌数
-    const maxTileCount = Math.max(...totalTileCounts);
-    
-    // 确保牌数在13-20之间
-    const clampedTileCount = Math.min(Math.max(maxTileCount, 13), 20);
-    
-    // 计算宽度（每个麻将牌32px）
-    return `${clampedTileCount * 32}px`;
+    // 计算宽度（每个麻将牌28px，更紧密）
+    return Math.max(clampedTileCount * 28, 400); // 最小宽度400px
   };
   
-  // 获取动态宽度
-  const playerAreaWidth = calculatePlayerAreaWidth();
+  // 获取所有玩家的动态宽度
+  const playerAreaWidths = {
+    player0: calculatePlayerAreaWidth(0),
+    player1: calculatePlayerAreaWidth(1), 
+    player2: calculatePlayerAreaWidth(2),
+    player3: calculatePlayerAreaWidth(3)
+  };
+  
+  // 计算整体最大宽度（用于对家和我的区域）
+  const maxPlayerWidth = Math.max(...Object.values(playerAreaWidths));
+  
+  // 上家和下家使用固定较小宽度，防止撑开整个区域
+  const sidePlayerWidth = Math.min(playerAreaWidths.player1, playerAreaWidths.player3, 480); // 最大480px
   
   // 未出牌数：等于选择区域中显示的所有牌的右上角数字之和
   const unplayedTiles = calculateUnplayedTiles();
@@ -242,7 +236,10 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
     if (tiles.length === 0) return null;
     
     return (
-      <div className="flex gap-0">
+      <div className="flex gap-0" style={{
+        minWidth: 'max-content',
+        flexShrink: 0
+      }}>
         {tiles.map((tile: Tile, index: number) => (
           <MahjongTile
             key={`${prefix}-discard-${index}`}
@@ -274,7 +271,11 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
     }`;
     
     return (
-      <div className={playerAreaClassName} style={{ height: '140px', }}>
+      <div className={playerAreaClassName} style={{ 
+        height: '140px',
+        minWidth: '400px',
+        width: '100%'
+      }}>
         {/* 玩家名称和统计信息 */}
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
@@ -314,17 +315,29 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
         </div>
 
         {/* 内容区域 - 可滚动 */}
-        <div style={{ height: '80px', }}>
+        <div style={{ height: '80px', overflow: 'hidden' }}>
           {/* 手牌和碰杠牌 - 分开显示，手牌与碰杠牌间有较大间距(gap-4) */}
           <div className="mb-1">
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '20px'}}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'flex-end', 
+              gap: '20px',
+              overflowX: 'auto',
+              overflowY: 'hidden',
+              paddingBottom: '2px',
+              scrollbarWidth: 'thin'
+            }}>
               {/* 手牌区域 */}
               {(() => {
                 const handTileCount = hand.tile_count || (hand.tiles?.length || 0);
                 
                 if (handTileCount > 0) {
                   return (
-                    <div style={{ display: 'flex' }}>
+                    <div style={{ 
+                      display: 'flex',
+                      flexShrink: 0,
+                      minWidth: 'max-content'
+                    }}>
                       {/* 玩家0（我）：显示具体牌面 */}
                       {playerId === 0 && hand.tiles ? (
                         hand.tiles.map((tile: Tile, index: number) => {
@@ -448,7 +461,12 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
               
               {/* 碰牌杠牌区域 - 组间有小间隙(gap-2) */}
               {hand.melds.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'flex-end',
+                  flexShrink: 0,
+                  minWidth: 'max-content'
+                }}>
                   {hand.melds.map((meld, index) => (
                     <div key={`meld-${index}`} className="relative" style={{ 
                       display: 'flex', 
@@ -456,7 +474,8 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
                       backgroundColor: 'rgba(255,255,255,0.8)', 
                       padding: '0px 2px', 
                       borderRadius: '1px', 
-                      border: '0px solid rgba(0,0,0,0.1)' 
+                      border: '0px solid rgba(0,0,0,0.1)',
+                      flexShrink: 0
                     }}>
                       {meld.tiles.map((tile: Tile, tileIndex: number) => {
                         // 暗杠显示逻辑
@@ -550,7 +569,12 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
           </div>
 
           {/* 弃牌 */}
-          <div>
+          <div style={{
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            paddingBottom: '2px',
+            scrollbarWidth: 'thin'
+          }}>
             {renderDiscardGroup(discards, `player-${playerId}`)}
           </div>
         </div>
@@ -596,34 +620,53 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
       <div className="flex flex-col gap-4">
         {/* 第一行：对家（居中） */}
         <div className="flex justify-center">
-          <div style={{ width: playerAreaWidth }}>
+          <div style={{ 
+            width: `${maxPlayerWidth}px`,
+            maxWidth: '100%'
+          }}>
             {renderPlayerArea(2)}
           </div>
         </div>
         
         {/* 第二行：上家和下家（左右分布）以及中间的剩余牌数 */}
-        <div className="flex items-center justify-center gap-4">
-          <div style={{ width: playerAreaWidth }}>
+        <div className="flex items-center justify-between gap-2" style={{
+          maxWidth: `${maxPlayerWidth}px`,
+          margin: '0 auto'
+        }}>
+          <div style={{ 
+            width: `${sidePlayerWidth}px`,
+            maxWidth: '45%',
+            flexShrink: 1
+          }}>
             {renderPlayerArea(3)}
           </div>
+          
           {/* 中间剩余牌数显示区域 */}
-          <div className="flex items-center justify-center bg-white rounded-lg p-2 shadow-md border border-gray-200 w-24 h-24 aspect-square">
+          <div className="flex items-center justify-center bg-white rounded-lg p-2 shadow-md border border-gray-200 w-20 h-20 flex-shrink-0">
             <motion.div
               animate={{ scale: [1, 1.05, 1] }}
               transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              className="text-2xl font-bold text-green-600"
+              className="text-xl font-bold text-green-600"
             >
               {remainingTiles}
             </motion.div>
           </div>
-          <div style={{ width: playerAreaWidth }}>
+          
+          <div style={{ 
+            width: `${sidePlayerWidth}px`,
+            maxWidth: '45%',
+            flexShrink: 1
+          }}>
             {renderPlayerArea(1)}
           </div>
         </div>
         
         {/* 第三行：我（居中） */}
         <div className="flex justify-center">
-          <div style={{ width: playerAreaWidth }}>
+          <div style={{ 
+            width: `${maxPlayerWidth}px`,
+            maxWidth: '100%'
+          }}>
             {renderPlayerArea(0)}
           </div>
         </div>
