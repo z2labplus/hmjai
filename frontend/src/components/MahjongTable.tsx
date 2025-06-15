@@ -596,14 +596,14 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
       <div className="flex flex-col gap-4 w-fit">
         {/* 第一行：对家（居中） */}
         <div className="flex justify-center">
-          <div style={{ width: playerAreaWidth }}>
+          <div>
             {renderPlayerArea(2)}
           </div>
         </div>
         
         {/* 第二行：上家和下家（左右分布）以及中间的剩余牌数 */}
         <div className="flex items-center justify-center gap-4">
-          <div style={{ width: playerAreaWidth }}>
+          <div>
             {renderPlayerArea(3)}
           </div>
           {/* 中间剩余牌数显示区域 */}
@@ -616,14 +616,14 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
               {remainingTiles}
             </motion.div>
           </div>
-          <div style={{ width: playerAreaWidth }}>
+          <div>
             {renderPlayerArea(1)}
           </div>
         </div>
         
         {/* 第三行：我（居中） */}
         <div className="flex justify-center">
-          <div style={{ width: playerAreaWidth }}>
+          <div>
             {renderPlayerArea(0)}
           </div>
         </div>
