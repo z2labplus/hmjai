@@ -137,7 +137,7 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
     const clampedTileCount = Math.min(Math.max(maxTileCount, 13), 20);
     
     // 计算宽度（每个麻将牌32px）
-    return `${clampedTileCount * 32}px`;
+    return `${clampedTileCount * 34}px`;
   };
   
   // 获取动态宽度
@@ -593,7 +593,7 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
       </div>
 
       {/* 玩家区域 - 三行布局 */}
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 w-fit">
         {/* 第一行：对家（居中） */}
         <div className="flex justify-center">
           <div style={{ width: playerAreaWidth }}>
