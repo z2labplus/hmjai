@@ -6,6 +6,7 @@ import { Tile, MeldType, GangType, HandTiles } from '../types/mahjong';
 import MahjongTile from './MahjongTile';
 import SimpleSourceIndicator from './SimpleSourceIndicator';
 import { CardBackStyle } from './MahjongTile';
+import { wrap } from 'module';
 
 interface MahjongTableProps {
   className?: string;
@@ -137,7 +138,7 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
     const clampedTileCount = Math.min(Math.max(maxTileCount, 13), 20);
     
     // 计算宽度（每个麻将牌32px）
-    return `${clampedTileCount * 32}px`;
+    return `${clampedTileCount * 34}px`;
   };
   
   // 获取动态宽度
@@ -603,7 +604,7 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
         
         {/* 第二行：上家和下家（左右分布）以及中间的剩余牌数 */}
         <div className="flex items-center justify-center gap-4">
-          <div style={{ width: playerAreaWidth }}>
+          <div style={{ width: playerAreaWidth }} >
             {renderPlayerArea(3)}
           </div>
           {/* 中间剩余牌数显示区域 */}
