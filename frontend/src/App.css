@@ -89,28 +89,22 @@
   background: #94a3b8;
 }
 
-/* 麻将桌面滚动条样式 */
-*::-webkit-scrollbar {
+/* 麻将桌面特定滚动条样式 */
+.mahjong-table-scroll::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
-*::-webkit-scrollbar-track {
+.mahjong-table-scroll::-webkit-scrollbar-track {
   background: rgba(0,0,0,0.1);
   border-radius: 3px;
 }
 
-*::-webkit-scrollbar-thumb {
+.mahjong-table-scroll::-webkit-scrollbar-thumb {
   background: rgba(0,0,0,0.3);
   border-radius: 3px;
 }
 
-*::-webkit-scrollbar-thumb:hover {
+.mahjong-table-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(0,0,0,0.5);
-}
-
-/* Firefox滚动条样式 */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(0,0,0,0.3) rgba(0,0,0,0.1);
 } 

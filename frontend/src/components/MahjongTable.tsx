@@ -318,14 +318,13 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
         <div style={{ height: '80px', overflow: 'hidden' }}>
           {/* 手牌和碰杠牌 - 分开显示，手牌与碰杠牌间有较大间距(gap-4) */}
           <div className="mb-1">
-            <div style={{ 
+            <div className="mahjong-table-scroll" style={{ 
               display: 'flex', 
               alignItems: 'flex-end', 
               gap: '20px',
               overflowX: 'auto',
               overflowY: 'hidden',
-              paddingBottom: '2px',
-              scrollbarWidth: 'thin'
+              paddingBottom: '2px'
             }}>
               {/* 手牌区域 */}
               {(() => {
@@ -569,11 +568,10 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
           </div>
 
           {/* 弃牌 */}
-          <div style={{
+          <div className="mahjong-table-scroll" style={{
             overflowX: 'auto',
             overflowY: 'hidden',
-            paddingBottom: '2px',
-            scrollbarWidth: 'thin'
+            paddingBottom: '2px'
           }}>
             {renderDiscardGroup(discards, `player-${playerId}`)}
           </div>

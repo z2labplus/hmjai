@@ -572,9 +572,9 @@ const ReplaySystem: React.FC = () => {
 
       {/* 主内容区 */}
       <div className="max-w-7xl mx-auto p-4">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
           {/* 麻将桌面 - 占3列 */}
-          <div className="lg:col-span-3 space-y-4">
+          <div className="xl:col-span-3 space-y-4">
             <div className="bg-white rounded-lg shadow-lg p-4">
               <MahjongTable cardBackStyle="elegant" />
             </div>
@@ -605,19 +605,19 @@ const ReplaySystem: React.FC = () => {
             
             {/* 所有麻将牌显示区域 */}
             <div className="bg-white rounded-lg shadow-lg p-4">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="text-lg font-semibold text-gray-800">🀄 所有麻将牌</div>
-                <div className="text-sm text-gray-500">剩余数量实时显示</div>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="text-base font-semibold text-gray-800">🀄 所有麻将牌</div>
+                <div className="text-xs text-gray-500">剩余数量实时显示</div>
               </div>
               
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {/* 万子 */}
                 <div>
-                  <div className="text-sm font-medium text-red-600 mb-2 flex items-center gap-2">
-                    <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                  <div className="text-xs font-medium text-red-600 mb-1 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
                     万子
                   </div>
-                  <div className="flex gap-1 flex-wrap">
+                  <div className="flex gap-0.5 flex-wrap">
                     {uniqueTiles
                       .filter(tile => tile.type === TileType.WAN)
                       .map((tile, index) => {
@@ -626,11 +626,11 @@ const ReplaySystem: React.FC = () => {
                           <div key={`wan-${tile.value}`} className="relative">
                             <MahjongTile
                               tile={tile}
-                              size="small"
+                              size="tiny"
                               variant="default"
                               cardBackStyle="elegant"
                               remainingCount={remainingCount}
-                              animationDelay={index * 0.02}
+                              animationDelay={index * 0.01}
                             />
                           </div>
                         );
@@ -640,11 +640,11 @@ const ReplaySystem: React.FC = () => {
                 
                 {/* 条子 */}
                 <div>
-                  <div className="text-sm font-medium text-green-600 mb-2 flex items-center gap-2">
-                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  <div className="text-xs font-medium text-green-600 mb-1 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
                     条子
                   </div>
-                  <div className="flex gap-1 flex-wrap">
+                  <div className="flex gap-0.5 flex-wrap">
                     {uniqueTiles
                       .filter(tile => tile.type === TileType.TIAO)
                       .map((tile, index) => {
@@ -653,11 +653,11 @@ const ReplaySystem: React.FC = () => {
                           <div key={`tiao-${tile.value}`} className="relative">
                             <MahjongTile
                               tile={tile}
-                              size="small"
+                              size="tiny"
                               variant="default"
                               cardBackStyle="elegant"
                               remainingCount={remainingCount}
-                              animationDelay={index * 0.02}
+                              animationDelay={index * 0.01}
                             />
                           </div>
                         );
@@ -667,11 +667,11 @@ const ReplaySystem: React.FC = () => {
                 
                 {/* 筒子 */}
                 <div>
-                  <div className="text-sm font-medium text-blue-600 mb-2 flex items-center gap-2">
-                    <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                  <div className="text-xs font-medium text-blue-600 mb-1 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
                     筒子
                   </div>
-                  <div className="flex gap-1 flex-wrap">
+                  <div className="flex gap-0.5 flex-wrap">
                     {uniqueTiles
                       .filter(tile => tile.type === TileType.TONG)
                       .map((tile, index) => {
@@ -680,11 +680,11 @@ const ReplaySystem: React.FC = () => {
                           <div key={`tong-${tile.value}`} className="relative">
                             <MahjongTile
                               tile={tile}
-                              size="small"
+                              size="tiny"
                               variant="default"
                               cardBackStyle="elegant"
                               remainingCount={remainingCount}
-                              animationDelay={index * 0.02}
+                              animationDelay={index * 0.01}
                             />
                           </div>
                         );
@@ -698,9 +698,9 @@ const ReplaySystem: React.FC = () => {
           {/* 侧边栏 - 占1列 */}
           <div className="space-y-6">
             {/* 玩家信息 */}
-            <div className="bg-white rounded-lg shadow-lg p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">👥 玩家信息</h3>
+            <div className="bg-white rounded-lg shadow-lg p-3">
+              <div className="flex items-center gap-2 mb-3">
+                <h3 className="text-base font-semibold text-gray-800">👥 玩家信息</h3>
                 {currentAction && (
                   <motion.div
                     animate={{ scale: [1, 1.1, 1] }}
@@ -717,7 +717,7 @@ const ReplaySystem: React.FC = () => {
                     <motion.div
                       key={player.id}
                       className={classNames(
-                        'p-4 rounded-xl border-2 transition-all duration-300 relative overflow-hidden',
+                        'p-3 rounded-lg border-2 transition-all duration-300 relative overflow-hidden',
                         {
                           'border-green-400 bg-gradient-to-br from-green-50 to-green-100 shadow-md': player.is_winner,
                           'border-gray-200 bg-gradient-to-br from-gray-50 to-gray-100': !player.is_winner && !isCurrentPlayer,
@@ -754,10 +754,10 @@ const ReplaySystem: React.FC = () => {
                         </motion.div>
                       )}
                       
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="text-2xl">{playerIcons[player.position]}</div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="text-lg">{playerIcons[player.position]}</div>
                         <div>
-                          <div className="font-bold text-gray-800">{player.name}</div>
+                          <div className="font-medium text-gray-800 text-sm">{player.name}</div>
                           <div className="text-xs text-gray-500">座位 {player.position + 1}</div>
                         </div>
                       </div>
@@ -790,22 +790,22 @@ const ReplaySystem: React.FC = () => {
                         </div>
                         
                         {/* 统计信息 */}
-                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-200">
+                        <div className="grid grid-cols-4 gap-1 pt-2 border-t border-gray-200">
                           <div className="text-center">
-                            <div className="text-xs text-gray-500">摸牌</div>
-                            <div className="font-medium">{player.statistics.draw_count}</div>
+                            <div className="text-xs text-gray-500">摸</div>
+                            <div className="text-sm font-medium">{player.statistics.draw_count}</div>
                           </div>
                           <div className="text-center">
-                            <div className="text-xs text-gray-500">弃牌</div>
-                            <div className="font-medium">{player.statistics.discard_count}</div>
+                            <div className="text-xs text-gray-500">弃</div>
+                            <div className="text-sm font-medium">{player.statistics.discard_count}</div>
                           </div>
                           <div className="text-center">
-                            <div className="text-xs text-gray-500">碰牌</div>
-                            <div className="font-medium text-orange-600">{player.statistics.peng_count}</div>
+                            <div className="text-xs text-gray-500">碰</div>
+                            <div className="text-sm font-medium text-orange-600">{player.statistics.peng_count}</div>
                           </div>
                           <div className="text-center">
-                            <div className="text-xs text-gray-500">杠牌</div>
-                            <div className="font-medium text-purple-600">{player.statistics.gang_count}</div>
+                            <div className="text-xs text-gray-500">杠</div>
+                            <div className="text-sm font-medium text-purple-600">{player.statistics.gang_count}</div>
                           </div>
                         </div>
                       </div>
@@ -816,15 +816,15 @@ const ReplaySystem: React.FC = () => {
             </div>
 
             {/* 操作历史 */}
-            <div className="bg-white rounded-lg shadow-lg p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">📜 操作历史</h3>
+            <div className="bg-white rounded-lg shadow-lg p-3">
+              <div className="flex items-center gap-2 mb-3">
+                <h3 className="text-base font-semibold text-gray-800">📜 操作历史</h3>
                 <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
                   {actionHistory.length} 条记录
                 </div>
               </div>
               
-              <div className="max-h-80 overflow-y-auto space-y-2 custom-scrollbar">
+              <div className="max-h-64 overflow-y-auto space-y-1 custom-scrollbar">
                 {actionHistory.slice(-15).map((action, index) => {
                   const isLatest = index === actionHistory.length - 1;
                   const actionIcons = {
@@ -847,7 +847,7 @@ const ReplaySystem: React.FC = () => {
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.05 }}
                       className={classNames(
-                        'text-sm p-3 rounded-lg border-l-4 transition-all duration-200',
+                        'text-xs p-2 rounded-md border-l-3 transition-all duration-200',
                         {
                           'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-400 text-blue-800 shadow-md': isLatest,
                           'bg-gray-50 border-gray-300 text-gray-600 hover:bg-gray-100': !isLatest
@@ -855,8 +855,8 @@ const ReplaySystem: React.FC = () => {
                       )}
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-base">{icon}</span>
-                        <span className={classNames('flex-1', {
+                        <span className="text-sm">{icon}</span>
+                        <span className={classNames('flex-1 text-xs', {
                           'font-medium': isLatest
                         })}>
                           {action}
