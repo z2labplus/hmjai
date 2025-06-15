@@ -594,7 +594,7 @@ const MahjongTable: React.FC<MahjongTableProps> = ({ className, cardBackStyle = 
       </div>
 
       {/* 玩家区域 - 三行布局 */}
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 w-fit">
         {/* 第一行：对家（居中） */}
         <div className="flex justify-center">
           <div style={{ width: playerAreaWidth }}>
