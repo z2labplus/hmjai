@@ -424,7 +424,7 @@ const ReplaySystem: React.FC = () => {
     <div className="replay-system min-h-screen bg-gray-50">
       {/* 头部控制区 */}
       <div className="bg-white shadow-sm border-b p-4">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-full mx-auto px-4 sm:px-6">
           <div className="flex justify-between items-center mb-4">
             <div>
               <h2 className="text-xl font-bold text-gray-800">
