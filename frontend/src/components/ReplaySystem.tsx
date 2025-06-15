@@ -614,12 +614,8 @@ const ReplaySystem: React.FC = () => {
               </div>
               
               <div className="space-y-2">
-                {/* 万子 */}
                 <div>
-                  <div className="text-xs font-medium text-red-600 mb-1 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
-                    万子
-                  </div>
+ 
                   <div className="flex gap-0.5 flex-wrap">
                     {uniqueTiles
                       .filter(tile => tile.type === TileType.WAN)
@@ -638,16 +634,7 @@ const ReplaySystem: React.FC = () => {
                           </div>
                         );
                       })}
-                  </div>
-                </div>
-                
-                {/* 条子 */}
-                <div>
-                  <div className="text-xs font-medium text-green-600 mb-1 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                    条子
-                  </div>
-                  <div className="flex gap-0.5 flex-wrap">
+
                     {uniqueTiles
                       .filter(tile => tile.type === TileType.TIAO)
                       .map((tile, index) => {
@@ -665,16 +652,9 @@ const ReplaySystem: React.FC = () => {
                           </div>
                         );
                       })}
-                  </div>
-                </div>
-                
-                {/* 筒子 */}
-                <div>
-                  <div className="text-xs font-medium text-blue-600 mb-1 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                    筒子
-                  </div>
-                  <div className="flex gap-0.5 flex-wrap">
+
+
+
                     {uniqueTiles
                       .filter(tile => tile.type === TileType.TONG)
                       .map((tile, index) => {
@@ -692,8 +672,15 @@ const ReplaySystem: React.FC = () => {
                           </div>
                         );
                       })}
+
+
+
+
+
+
                   </div>
                 </div>
+                
               </div>
             </div>
           </div>
