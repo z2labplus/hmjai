@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useWebSocketGameStore } from '../stores/webSocketGameStore';
 import { Tile, GameState, createTile, MeldType, GangType, TileType } from '../types/mahjong';
 import MahjongTable from './MahjongTable';
+import MahjongTile from './MahjongTile';
 import ReplayImporter from './ReplayImporter';
 import classNames from 'classnames';
 
@@ -55,6 +56,63 @@ const ReplaySystem: React.FC = () => {
   const [playSpeed, setPlaySpeed] = useState(1000);
   const [showImporter, setShowImporter] = useState(true);
   const [actionHistory, setActionHistory] = useState<string[]>([]);
+
+  // 生成所有麻将牌用于显示
+  const allMahjongTiles = useMemo(() => {
+    const tiles: Tile[] = [];
+    // 万、条、筒，每种花色1-9各4张
+    [TileType.WAN, TileType.TIAO, TileType.TONG].forEach(suit => {
+      for (let value = 1; value <= 9; value++) {
+        for (let count = 0; count < 4; count++) {
+          tiles.push(createTile(suit, value));
+        }
+      }
+    });
+    return tiles;
+  }, []);
+
+  // 获取牌的剩余数量（用于显示）
+  const getTileRemainingCount = useCallback((tile: Tile): number => {
+    if (!gameState) return 4;
+    
+    let usedCount = 0;
+    
+    // 统计所有玩家手牌中的使用数量
+    Object.values(gameState.player_hands).forEach(hand => {
+      if (hand.tiles) {
+        usedCount += hand.tiles.filter(t => 
+          t.type === tile.type && t.value === tile.value
+        ).length;
+      }
+      
+      // 统计明牌中的使用数量
+      hand.melds.forEach(meld => {
+        usedCount += meld.tiles.filter(t => 
+          t.type === tile.type && t.value === tile.value
+        ).length;
+      });
+    });
+    
+    // 统计弃牌中的使用数量
+    if (gameState.discarded_tiles) {
+      usedCount += gameState.discarded_tiles.filter(t => 
+        t.type === tile.type && t.value === tile.value
+      ).length;
+    }
+    
+    return Math.max(0, 4 - usedCount);
+  }, [gameState]);
+
+  // 获取去重的麻将牌（用于显示）
+  const uniqueTiles = useMemo(() => {
+    const seen = new Set<string>();
+    return allMahjongTiles.filter(tile => {
+      const key = `${tile.type}-${tile.value}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [allMahjongTiles]);
 
   // 解析牌的字符串格式 (如 "1万", "5条")
   const parseCardString = useCallback((cardStr: string): Tile | null => {
@@ -396,75 +454,144 @@ const ReplaySystem: React.FC = () => {
 
           {/* 播放控制 */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
+            <div className="flex items-center gap-2">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={handleReset}
-                className="px-3 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                className="px-4 py-2 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200 font-medium"
               >
-                重置
-              </button>
-              <button
+                🔄 重置
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={handleStepBackward}
-                className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
                 disabled={currentStep <= -1}
+                className={classNames(
+                  'px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 font-medium',
+                  currentStep <= -1
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
+                )}
               >
                 ⏮️ 上一步
-              </button>
-              <button
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={handlePlayPause}
-                className={classNames('px-4 py-2 text-white rounded', {
-                  'bg-green-500 hover:bg-green-600': !isPlaying,
-                  'bg-red-500 hover:bg-red-600': isPlaying
-                })}
+                className={classNames(
+                  'px-6 py-2 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 font-medium text-white',
+                  isPlaying
+                    ? 'bg-gradient-to-r from-red-500 to-red-600'
+                    : 'bg-gradient-to-r from-green-500 to-green-600'
+                )}
               >
                 {isPlaying ? '⏸️ 暂停' : '▶️ 播放'}
-              </button>
-              <button
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={handleStepForward}
-                className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
                 disabled={currentStep >= replayData.actions.length - 1}
+                className={classNames(
+                  'px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 font-medium',
+                  currentStep >= replayData.actions.length - 1
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
+                )}
               >
                 下一步 ⏭️
-              </button>
+              </motion.button>
             </div>
 
             <div className="flex items-center gap-4">
-              <div className="text-sm text-gray-600">
+              <div className="px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium">
                 步骤 {Math.max(0, currentStep + 1)} / {replayData.actions.length}
               </div>
               
               <select
                 value={playSpeed}
                 onChange={(e) => setPlaySpeed(Number(e.target.value))}
-                className="px-2 py-1 border border-gray-300 rounded text-sm"
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
               >
-                <option value={2000}>0.5x</option>
-                <option value={1000}>1x</option>
-                <option value={500}>2x</option>
-                <option value={250}>4x</option>
+                <option value={2000}>🐌 0.5x</option>
+                <option value={1000}>🚶 1x</option>
+                <option value={500}>🏃 2x</option>
+                <option value={250}>🚀 4x</option>
               </select>
             </div>
           </div>
 
           {/* 进度条 */}
           <div className="mt-4">
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+            <div className="relative w-full bg-gradient-to-r from-gray-200 to-gray-300 rounded-full h-3 shadow-inner">
+              <motion.div 
+                className="bg-gradient-to-r from-blue-500 to-purple-600 h-3 rounded-full shadow-lg"
                 style={{ 
                   width: `${((currentStep + 1) / replayData.actions.length) * 100}%` 
                 }}
-              />
+                animate={{
+                  width: `${((currentStep + 1) / replayData.actions.length) * 100}%`
+                }}
+                transition={{ duration: 0.3, ease: "easeInOut" }}
+              >
+                <div className="h-full w-full bg-gradient-to-r from-white/20 to-transparent rounded-full"></div>
+              </motion.div>
+              
+              {/* 进度条上的时间标记点 */}
+              {replayData.actions.length > 0 && (
+                <div className="absolute top-0 left-0 w-full h-full">
+                  {[0, 0.25, 0.5, 0.75, 1].map((pos, index) => (
+                    <div
+                      key={index}
+                      className="absolute top-0 w-0.5 h-3 bg-white/50 rounded-full"
+                      style={{ left: `${pos * 100}%` }}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
+            
             <input
               type="range"
               min="-1"
               max={replayData.actions.length - 1}
               value={currentStep}
               onChange={(e) => setCurrentStep(Number(e.target.value))}
-              className="w-full mt-1 opacity-70 cursor-pointer"
+              className="w-full mt-2 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider-thumb"
+              style={{
+                background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((currentStep + 1) / replayData.actions.length) * 100}%, #e5e7eb ${((currentStep + 1) / replayData.actions.length) * 100}%, #e5e7eb 100%)`
+              }}
             />
           </div>
+          
+          <style jsx>{`
+            .slider-thumb::-webkit-slider-thumb {
+              appearance: none;
+              height: 20px;
+              width: 20px;
+              border-radius: 50%;
+              background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+              cursor: pointer;
+              box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+              transition: all 0.2s ease;
+            }
+            .slider-thumb::-webkit-slider-thumb:hover {
+              transform: scale(1.2);
+              box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5);
+            }
+            .slider-thumb::-moz-range-thumb {
+              height: 20px;
+              width: 20px;
+              border-radius: 50%;
+              background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+              cursor: pointer;
+              border: none;
+              box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+            }
+          `}</style>
         </div>
       </div>
 
@@ -472,8 +599,8 @@ const ReplaySystem: React.FC = () => {
       <div className="max-w-7xl mx-auto p-4">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* 麻将桌面 - 占3列 */}
-          <div className="lg:col-span-3">
-            <div className="bg-white rounded-lg shadow p-4">
+          <div className="lg:col-span-3 space-y-4">
+            <div className="bg-white rounded-lg shadow-lg p-4">
               <MahjongTable cardBackStyle="elegant" />
             </div>
             
@@ -482,7 +609,7 @@ const ReplaySystem: React.FC = () => {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4"
+                className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 shadow-sm"
               >
                 <div className="text-lg font-medium text-blue-800">
                   {getActionDescription(currentAction, replayData.players[currentAction.player_id]?.name || `玩家${currentAction.player_id + 1}`)}
@@ -490,77 +617,312 @@ const ReplaySystem: React.FC = () => {
                 <div className="text-sm text-blue-600 mt-1">
                   {new Date(currentAction.timestamp).toLocaleTimeString()}
                   {currentAction.score_change !== 0 && (
-                    <span className={classNames('ml-2', {
-                      'text-green-600': currentAction.score_change > 0,
-                      'text-red-600': currentAction.score_change < 0
+                    <span className={classNames('ml-2 px-2 py-1 rounded-full text-xs font-medium', {
+                      'bg-green-100 text-green-700': currentAction.score_change > 0,
+                      'bg-red-100 text-red-700': currentAction.score_change < 0
                     })}>
-                      ({currentAction.score_change > 0 ? '+' : ''}{currentAction.score_change}分)
+                      {currentAction.score_change > 0 ? '+' : ''}{currentAction.score_change}分
                     </span>
                   )}
                 </div>
               </motion.div>
             )}
+            
+            {/* 所有麻将牌显示区域 */}
+            <div className="bg-white rounded-lg shadow-lg p-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="text-lg font-semibold text-gray-800">🀄 所有麻将牌</div>
+                <div className="text-sm text-gray-500">剩余数量实时显示</div>
+              </div>
+              
+              <div className="space-y-3">
+                {/* 万子 */}
+                <div>
+                  <div className="text-sm font-medium text-red-600 mb-2 flex items-center gap-2">
+                    <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                    万子
+                  </div>
+                  <div className="flex gap-1 flex-wrap">
+                    {uniqueTiles
+                      .filter(tile => tile.type === TileType.WAN)
+                      .map((tile, index) => {
+                        const remainingCount = getTileRemainingCount(tile);
+                        return (
+                          <div key={`wan-${tile.value}`} className="relative">
+                            <MahjongTile
+                              tile={tile}
+                              size="small"
+                              variant="default"
+                              cardBackStyle="elegant"
+                              remainingCount={remainingCount}
+                              animationDelay={index * 0.02}
+                            />
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+                
+                {/* 条子 */}
+                <div>
+                  <div className="text-sm font-medium text-green-600 mb-2 flex items-center gap-2">
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    条子
+                  </div>
+                  <div className="flex gap-1 flex-wrap">
+                    {uniqueTiles
+                      .filter(tile => tile.type === TileType.TIAO)
+                      .map((tile, index) => {
+                        const remainingCount = getTileRemainingCount(tile);
+                        return (
+                          <div key={`tiao-${tile.value}`} className="relative">
+                            <MahjongTile
+                              tile={tile}
+                              size="small"
+                              variant="default"
+                              cardBackStyle="elegant"
+                              remainingCount={remainingCount}
+                              animationDelay={index * 0.02}
+                            />
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+                
+                {/* 筒子 */}
+                <div>
+                  <div className="text-sm font-medium text-blue-600 mb-2 flex items-center gap-2">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                    筒子
+                  </div>
+                  <div className="flex gap-1 flex-wrap">
+                    {uniqueTiles
+                      .filter(tile => tile.type === TileType.TONG)
+                      .map((tile, index) => {
+                        const remainingCount = getTileRemainingCount(tile);
+                        return (
+                          <div key={`tong-${tile.value}`} className="relative">
+                            <MahjongTile
+                              tile={tile}
+                              size="small"
+                              variant="default"
+                              cardBackStyle="elegant"
+                              remainingCount={remainingCount}
+                              animationDelay={index * 0.02}
+                            />
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* 侧边栏 - 占1列 */}
           <div className="space-y-6">
             {/* 玩家信息 */}
-            <div className="bg-white rounded-lg shadow p-4">
-              <h3 className="font-semibold text-gray-800 mb-3">玩家信息</h3>
-              <div className="space-y-3">
-                {replayData.players.map((player) => (
+            <div className="bg-white rounded-lg shadow-lg p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <h3 className="text-lg font-semibold text-gray-800">👥 玩家信息</h3>
+                {currentAction && (
                   <motion.div
-                    key={player.id}
-                    className={classNames('p-3 rounded border-2 transition-all', {
-                      'border-green-500 bg-green-50': player.is_winner,
-                      'border-gray-300 bg-gray-50': !player.is_winner,
-                      'ring-2 ring-blue-500': currentAction?.player_id === player.position
-                    })}
-                    animate={{
-                      scale: currentAction?.player_id === player.position ? 1.02 : 1
-                    }}
-                  >
-                    <div className="font-medium">{player.name}</div>
-                    <div className="text-sm text-gray-600">座位 {player.position + 1}</div>
-                    <div className="text-sm text-gray-600">
-                      定缺: {player.missing_suit ? `${player.missing_suit === 'wan' ? '万' : player.missing_suit === 'tiao' ? '条' : '筒'}` : '未定'}
-                    </div>
-                    <div className="text-sm">
-                      得分: 
-                      <span className={classNames('ml-1 font-medium', {
-                        'text-green-600': player.final_score > 0,
-                        'text-red-600': player.final_score < 0,
-                        'text-gray-600': player.final_score === 0
-                      })}>
-                        {player.final_score}
-                      </span>
-                    </div>
-                  </motion.div>
-                ))}
+                    animate={{ scale: [1, 1.1, 1] }}
+                    transition={{ duration: 0.6, repeat: Infinity }}
+                    className="w-2 h-2 bg-orange-500 rounded-full"
+                  />
+                )}
+              </div>
+              <div className="space-y-3">
+                {replayData.players.map((player) => {
+                  const isCurrentPlayer = currentAction?.player_id === player.position;
+                  const playerIcons = ['🧑', '👨', '👩', '🧓'];
+                  return (
+                    <motion.div
+                      key={player.id}
+                      className={classNames(
+                        'p-4 rounded-xl border-2 transition-all duration-300 relative overflow-hidden',
+                        {
+                          'border-green-400 bg-gradient-to-br from-green-50 to-green-100 shadow-md': player.is_winner,
+                          'border-gray-200 bg-gradient-to-br from-gray-50 to-gray-100': !player.is_winner && !isCurrentPlayer,
+                          'border-orange-400 bg-gradient-to-br from-orange-50 to-orange-100 shadow-lg ring-2 ring-orange-200': isCurrentPlayer
+                        }
+                      )}
+                      animate={{
+                        scale: isCurrentPlayer ? 1.02 : 1,
+                        y: isCurrentPlayer ? -2 : 0
+                      }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      {/* 当前玩家指示器 */}
+                      {isCurrentPlayer && (
+                        <motion.div
+                          className="absolute top-2 right-2"
+                          animate={{ rotate: [0, 360] }}
+                          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                        >
+                          <div className="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                            ⚡
+                          </div>
+                        </motion.div>
+                      )}
+                      
+                      {/* 胜利者皇冠 */}
+                      {player.is_winner && (
+                        <motion.div
+                          className="absolute top-2 right-2"
+                          animate={{ y: [-2, 2, -2] }}
+                          transition={{ duration: 1.5, repeat: Infinity }}
+                        >
+                          <div className="text-xl">👑</div>
+                        </motion.div>
+                      )}
+                      
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="text-2xl">{playerIcons[player.position]}</div>
+                        <div>
+                          <div className="font-bold text-gray-800">{player.name}</div>
+                          <div className="text-xs text-gray-500">座位 {player.position + 1}</div>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-600">定缺:</span>
+                          <span className={classNames('px-2 py-1 rounded-full text-xs font-medium', {
+                            'bg-red-100 text-red-700': player.missing_suit === 'wan',
+                            'bg-green-100 text-green-700': player.missing_suit === 'tiao',
+                            'bg-blue-100 text-blue-700': player.missing_suit === 'tong',
+                            'bg-gray-100 text-gray-500': !player.missing_suit
+                          })}>
+                            {player.missing_suit ? 
+                              `${player.missing_suit === 'wan' ? '万' : player.missing_suit === 'tiao' ? '条' : '筒'}` : 
+                              '未定'
+                            }
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-600">得分:</span>
+                          <span className={classNames('px-2 py-1 rounded-full text-xs font-bold', {
+                            'bg-green-100 text-green-700': player.final_score > 0,
+                            'bg-red-100 text-red-700': player.final_score < 0,
+                            'bg-gray-100 text-gray-600': player.final_score === 0
+                          })}>
+                            {player.final_score > 0 ? '+' : ''}{player.final_score}
+                          </span>
+                        </div>
+                        
+                        {/* 统计信息 */}
+                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-200">
+                          <div className="text-center">
+                            <div className="text-xs text-gray-500">摸牌</div>
+                            <div className="font-medium">{player.statistics.draw_count}</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-xs text-gray-500">弃牌</div>
+                            <div className="font-medium">{player.statistics.discard_count}</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-xs text-gray-500">碰牌</div>
+                            <div className="font-medium text-orange-600">{player.statistics.peng_count}</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-xs text-gray-500">杠牌</div>
+                            <div className="font-medium text-purple-600">{player.statistics.gang_count}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
             </div>
 
             {/* 操作历史 */}
-            <div className="bg-white rounded-lg shadow p-4">
-              <h3 className="font-semibold text-gray-800 mb-3">操作历史</h3>
-              <div className="max-h-64 overflow-y-auto space-y-1">
-                {actionHistory.slice(-10).map((action, index) => (
-                  <div
-                    key={index}
-                    className={classNames('text-sm p-2 rounded', {
-                      'bg-blue-100 text-blue-800': index === actionHistory.length - 1,
-                      'text-gray-600': index !== actionHistory.length - 1
-                    })}
-                  >
-                    {action}
-                  </div>
-                ))}
+            <div className="bg-white rounded-lg shadow-lg p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <h3 className="text-lg font-semibold text-gray-800">📜 操作历史</h3>
+                <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                  {actionHistory.length} 条记录
+                </div>
+              </div>
+              
+              <div className="max-h-80 overflow-y-auto space-y-2 custom-scrollbar">
+                {actionHistory.slice(-15).map((action, index) => {
+                  const isLatest = index === actionHistory.length - 1;
+                  const actionIcons = {
+                    '摸牌': '🀄',
+                    '弃牌': '🗑️',
+                    '碰牌': '💥',
+                    '杠': '⚡',
+                    '胡牌': '🎉',
+                    '定缺': '🎯'
+                  };
+                  
+                  // 提取操作类型
+                  const actionType = Object.keys(actionIcons).find(type => action.includes(type));
+                  const icon = actionType ? actionIcons[actionType as keyof typeof actionIcons] : '🎮';
+                  
+                  return (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className={classNames(
+                        'text-sm p-3 rounded-lg border-l-4 transition-all duration-200',
+                        {
+                          'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-400 text-blue-800 shadow-md': isLatest,
+                          'bg-gray-50 border-gray-300 text-gray-600 hover:bg-gray-100': !isLatest
+                        }
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">{icon}</span>
+                        <span className={classNames('flex-1', {
+                          'font-medium': isLatest
+                        })}>
+                          {action}
+                        </span>
+                        {isLatest && (
+                          <motion.div
+                            animate={{ scale: [1, 1.2, 1] }}
+                            transition={{ duration: 1, repeat: Infinity }}
+                            className="w-2 h-2 bg-blue-500 rounded-full"
+                          />
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+                
                 {actionHistory.length === 0 && (
-                  <div className="text-sm text-gray-500 text-center py-4">
-                    暂无操作记录
+                  <div className="text-center py-8">
+                    <div className="text-4xl mb-2">📝</div>
+                    <div className="text-sm text-gray-500">暂无操作记录</div>
+                    <div className="text-xs text-gray-400 mt-1">操作将在这里显示</div>
                   </div>
                 )}
               </div>
+              
+              <style jsx>{`
+                .custom-scrollbar::-webkit-scrollbar {
+                  width: 4px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-track {
+                  background: #f1f5f9;
+                  border-radius: 2px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb {
+                  background: #cbd5e1;
+                  border-radius: 2px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                  background: #94a3b8;
+                }
+              `}</style>
             </div>
           </div>
         </div>
