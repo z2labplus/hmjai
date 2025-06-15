@@ -567,31 +567,6 @@ const ReplaySystem: React.FC = () => {
             />
           </div>
           
-          <style jsx>{`
-            .slider-thumb::-webkit-slider-thumb {
-              appearance: none;
-              height: 20px;
-              width: 20px;
-              border-radius: 50%;
-              background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-              cursor: pointer;
-              box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
-              transition: all 0.2s ease;
-            }
-            .slider-thumb::-webkit-slider-thumb:hover {
-              transform: scale(1.2);
-              box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5);
-            }
-            .slider-thumb::-moz-range-thumb {
-              height: 20px;
-              width: 20px;
-              border-radius: 50%;
-              background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-              cursor: pointer;
-              border: none;
-              box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
-            }
-          `}</style>
         </div>
       </div>
 
@@ -907,22 +882,6 @@ const ReplaySystem: React.FC = () => {
                 )}
               </div>
               
-              <style jsx>{`
-                .custom-scrollbar::-webkit-scrollbar {
-                  width: 4px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-track {
-                  background: #f1f5f9;
-                  border-radius: 2px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-thumb {
-                  background: #cbd5e1;
-                  border-radius: 2px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                  background: #94a3b8;
-                }
-              `}</style>
             </div>
           </div>
         </div>
